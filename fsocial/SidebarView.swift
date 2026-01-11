@@ -225,7 +225,7 @@ struct SidebarView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "key.fill")
                             .font(.system(size: 11))
-                        Text("Add Claude API Key")
+                        Text("Setup AI Provider")
                             .font(AppTypography.body)
                     }
                     .foregroundStyle(Color.appAccent)
@@ -271,22 +271,63 @@ struct SidebarView: View {
     
     // MARK: - API Key Sheet
     @State private var apiKeyInput = ""
-    
+
     private var apiKeySheet: some View {
         VStack(spacing: 16) {
-            Text("Claude API Key")
+            Text("AI Provider Setup")
                 .font(AppTypography.title)
                 .foregroundStyle(Color.appText)
-            
-            Text("Enter your Claude API key to enable AI-powered smart replies.")
+
+            Text("Choose your AI provider and enter your API key.")
                 .font(AppTypography.body)
                 .foregroundStyle(Color.appTextMuted)
                 .multilineTextAlignment(.center)
             
-            SecureField("sk-ant-...", text: $apiKeyInput)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 300)
+            // Provider Selection
+            VStack(alignment: .leading, spacing: 8) {
+                Text("PROVIDER")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+                
+                ForEach(AIProvider.allCases) { provider in
+                    ProviderButton(
+                        provider: provider,
+                        isSelected: aiService.selectedProvider == provider,
+                        hasKey: aiService.hasKey(for: provider)
+                    ) {
+                        aiService.setProvider(provider)
+                        apiKeyInput = aiService.getAPIKey() ?? ""
+                    }
+                }
+            }
+            .frame(width: 340)
             
+            Divider()
+            
+            // API Key Input
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(aiService.selectedProvider.keyLabel.uppercased())
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                    
+                    Spacer()
+                    
+                    Link("Get Key", destination: URL(string: aiService.selectedProvider.setupURL)!)
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appAccent)
+                }
+                
+                if aiService.selectedProvider == .ollama {
+                    TextField(aiService.selectedProvider.keyPlaceholder, text: $apiKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    SecureField(aiService.selectedProvider.keyPlaceholder, text: $apiKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+            .frame(width: 340)
+
             HStack {
                 Button("Cancel") {
                     apiKeyInput = ""
@@ -294,9 +335,9 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.appTextMuted)
-                
+
                 Spacer()
-                
+
                 Button("Save") {
                     if !apiKeyInput.isEmpty {
                         aiService.saveAPIKey(apiKeyInput)
@@ -307,14 +348,14 @@ struct SidebarView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(Color.appAccent)
             }
-            .frame(width: 300)
-            
+            .frame(width: 340)
+
             if aiService.hasAPIKey {
                 Divider()
-                
-                Button("Remove API Key") {
+
+                Button("Remove API Key for \(aiService.selectedProvider.rawValue)") {
                     aiService.clearAPIKey()
-                    showingAPIKeySheet = false
+                    apiKeyInput = ""
                 }
                 .foregroundStyle(Color.red)
                 .buttonStyle(.plain)
@@ -971,5 +1012,51 @@ struct AIReplyRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Provider Button
+struct ProviderButton: View {
+    let provider: AIProvider
+    let isSelected: Bool
+    let hasKey: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: provider.iconName)
+                    .font(.system(size: 14))
+                    .foregroundStyle(isSelected ? Color.white : Color.appAccent)
+                    .frame(width: 20)
+                
+                Text(provider.rawValue)
+                    .font(AppTypography.body)
+                    .foregroundStyle(isSelected ? Color.white : Color.appText)
+                
+                Spacer()
+                
+                if hasKey {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(isSelected ? Color.white : Color.green)
+                }
+                
+                if isSelected {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.appAccent : Color.appSecondary)
+            .cornerRadius(AppDimensions.borderRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
+                    .stroke(isSelected ? Color.appAccent : Color.appBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
