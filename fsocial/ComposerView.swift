@@ -11,12 +11,16 @@ import AVKit
 
 struct ComposerView: View {
     @ObservedObject var draftStore: DraftStore
+    @ObservedObject var hashtagStore: HashtagStore
+    @ObservedObject var historyStore: HistoryStore
     var onSwitchToPlatform: (Platform) -> Void
     
     @State private var showingMediaPicker = false
     @State private var showingSaveDraftAlert = false
     @State private var showingPostFlow = false
     @State private var currentPostingPlatform: Platform?
+    @State private var selectedHashtags: [String] = []
+    @State private var showHashtagPicker = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -57,10 +61,8 @@ struct ComposerView: View {
             
             Spacer()
             
-            // Character count
-            Text("\(draftStore.currentDraft.content.count)")
-                .font(AppTypography.sectionLabel)
-                .foregroundStyle(draftStore.currentDraft.content.count > 280 ? Color.red : Color.appTextMuted)
+            // Character count per selected platform
+            characterCountIndicator
             
             Spacer()
             
@@ -105,21 +107,51 @@ struct ComposerView: View {
         .background(Color.appBackground)
     }
     
+    // MARK: - Character Count Indicator
+    private var characterCountIndicator: some View {
+        HStack(spacing: 12) {
+            let contentLength = draftStore.currentDraft.content.count + selectedHashtags.joined(separator: " ").count
+            
+            ForEach(draftStore.currentDraft.platforms) { platform in
+                let remaining = platform.characterLimit - contentLength
+                let isOver = remaining < 0
+                
+                HStack(spacing: 4) {
+                    Image(systemName: platform.iconName)
+                        .font(.system(size: 10))
+                    Text("\(remaining)")
+                        .font(AppTypography.sectionLabel)
+                }
+                .foregroundStyle(isOver ? Color.red : (remaining < 50 ? Color.orange : Color.appTextMuted))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(isOver ? Color.red.opacity(0.1) : Color.appSecondary)
+                .cornerRadius(AppDimensions.borderRadius)
+            }
+        }
+    }
+    
     // MARK: - Composer Area
     private var composerArea: some View {
-        VStack(spacing: 16) {
-            // Platform Selection
-            platformSelection
-            
-            // Content Editor
-            contentEditor
-            
-            // Media Section
-            mediaSection
-            
-            Spacer()
+        ScrollView {
+            VStack(spacing: 16) {
+                // Platform Selection
+                platformSelection
+                
+                // Content Editor
+                contentEditor
+                
+                // Hashtag Section
+                hashtagSection
+                
+                // Media Section
+                mediaSection
+                
+                // Tips Section
+                tipsSection
+            }
+            .padding(AppDimensions.padding)
         }
-        .padding(AppDimensions.padding)
     }
     
     // MARK: - Platform Selection
@@ -164,6 +196,174 @@ struct ComposerView: View {
                     RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
                         .stroke(Color.appBorder, lineWidth: 1)
                 )
+            
+            // Character limit warnings
+            if !draftStore.currentDraft.platforms.isEmpty {
+                characterLimitWarnings
+            }
+        }
+    }
+    
+    // MARK: - Character Limit Warnings
+    private var characterLimitWarnings: some View {
+        let contentLength = draftStore.currentDraft.content.count + selectedHashtags.joined(separator: " ").count
+        
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(draftStore.currentDraft.platforms.filter { contentLength > $0.characterLimit }) { platform in
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                    Text("\(platform.rawValue): \(contentLength - platform.characterLimit) characters over limit")
+                        .font(AppTypography.sectionLabel)
+                }
+                .foregroundStyle(Color.red)
+            }
+        }
+    }
+    
+    // MARK: - Hashtag Section
+    private var hashtagSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("HASHTAGS")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+                
+                Spacer()
+                
+                Button {
+                    showHashtagPicker.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showHashtagPicker ? "chevron.up" : "chevron.down")
+                        Text(showHashtagPicker ? "Hide" : "Show Suggestions")
+                    }
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appAccent)
+                }
+                .buttonStyle(.plain)
+            }
+            
+            // Selected hashtags
+            if !selectedHashtags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(selectedHashtags, id: \.self) { tag in
+                            SelectedHashtagChip(tag: tag) {
+                                selectedHashtags.removeAll { $0 == tag }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Hashtag picker
+            if showHashtagPicker {
+                hashtagPicker
+            }
+        }
+    }
+    
+    // MARK: - Hashtag Picker
+    private var hashtagPicker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Suggested based on content
+            if !draftStore.currentDraft.content.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Suggested for your content")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(hashtagStore.suggestHashtags(for: draftStore.currentDraft.content)) { hashtag in
+                                HashtagButton(hashtag: hashtag, isSelected: selectedHashtags.contains(hashtag.tag)) {
+                                    toggleHashtag(hashtag.tag)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Categories
+            ForEach(HashtagCategory.allCases) { category in
+                let categoryHashtags = hashtagStore.hashtags(for: category)
+                if !categoryHashtags.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(category.rawValue)
+                            .font(AppTypography.sectionLabel)
+                            .foregroundStyle(Color.appTextMuted)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(categoryHashtags) { hashtag in
+                                    HashtagButton(hashtag: hashtag, isSelected: selectedHashtags.contains(hashtag.tag)) {
+                                        toggleHashtag(hashtag.tag)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.appSecondary.opacity(0.5))
+        .cornerRadius(AppDimensions.borderRadius)
+    }
+    
+    private func toggleHashtag(_ tag: String) {
+        if selectedHashtags.contains(tag) {
+            selectedHashtags.removeAll { $0 == tag }
+        } else {
+            selectedHashtags.append(tag)
+            if let hashtag = hashtagStore.hashtags.first(where: { $0.tag == tag }) {
+                hashtagStore.incrementUsage(hashtag)
+            }
+        }
+    }
+    
+    // MARK: - Tips Section
+    private var tipsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let platform = draftStore.currentDraft.platforms.first {
+                Text("TIPS FOR \(platform.rawValue.uppercased())")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(platform.growthTips.prefix(2), id: \.self) { tip in
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.yellow)
+                            Text(tip)
+                                .font(AppTypography.body)
+                                .foregroundStyle(Color.appTextMuted)
+                        }
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Text("Best times:")
+                            .font(AppTypography.sectionLabel)
+                            .foregroundStyle(Color.appTextMuted)
+                        
+                        ForEach(platform.bestPostingTimes, id: \.self) { time in
+                            Text(time)
+                                .font(AppTypography.sectionLabel)
+                                .foregroundStyle(Color.appAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.appAccent.opacity(0.1))
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color.appSecondary.opacity(0.3))
+                .cornerRadius(AppDimensions.borderRadius)
+            }
         }
     }
     
@@ -637,6 +837,59 @@ struct PostPlatformButton: View {
                 RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
                     .stroke(isPosted ? Color.appSuccess : Color.appBorder, lineWidth: 1)
             )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Selected Hashtag Chip
+struct SelectedHashtagChip: View {
+    let tag: String
+    let onRemove: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(tag)
+                .font(AppTypography.body)
+                .foregroundStyle(Color.appAccent)
+            
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.appTextMuted)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.appAccent.opacity(0.1))
+        .cornerRadius(AppDimensions.borderRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
+                .stroke(Color.appAccent.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Hashtag Button
+struct HashtagButton: View {
+    let hashtag: Hashtag
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(hashtag.tag)
+                .font(AppTypography.body)
+                .foregroundStyle(isSelected ? Color.white : Color.appTextMuted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.appAccent : Color.appSecondary)
+                .cornerRadius(AppDimensions.borderRadius)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
+                        .stroke(isSelected ? Color.appAccent : Color.appBorder, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }

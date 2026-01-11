@@ -12,6 +12,7 @@ enum ViewMode {
     case browser
     case scheduler
     case composer
+    case insights
 }
 
 struct ContentView: View {
@@ -19,6 +20,8 @@ struct ContentView: View {
     @StateObject private var replyStore = QuickReplyStore()
     @StateObject private var scheduleStore = ScheduleStore()
     @StateObject private var draftStore = DraftStore()
+    @StateObject private var hashtagStore = HashtagStore()
+    @StateObject private var historyStore = HistoryStore()
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var viewMode: ViewMode = .browser
@@ -34,6 +37,7 @@ struct ContentView: View {
                 replyStore: replyStore,
                 scheduleStore: scheduleStore,
                 draftStore: draftStore,
+                historyStore: historyStore,
                 viewMode: $viewMode,
                 onReplySelected: handleReplySelected
             )
@@ -63,10 +67,21 @@ struct ContentView: View {
                 if viewMode == .composer {
                     ComposerView(
                         draftStore: draftStore,
+                        hashtagStore: hashtagStore,
+                        historyStore: historyStore,
                         onSwitchToPlatform: { platform in
                             selectedPlatform = platform
                             viewMode = .browser
                         }
+                    )
+                    .transition(.opacity)
+                }
+                
+                // Insights view
+                if viewMode == .insights {
+                    InsightsView(
+                        historyStore: historyStore,
+                        hashtagStore: hashtagStore
                     )
                     .transition(.opacity)
                 }

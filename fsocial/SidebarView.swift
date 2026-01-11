@@ -12,6 +12,7 @@ struct SidebarView: View {
     @ObservedObject var replyStore: QuickReplyStore
     @ObservedObject var scheduleStore: ScheduleStore
     @ObservedObject var draftStore: DraftStore
+    @ObservedObject var historyStore: HistoryStore
     @Binding var viewMode: ViewMode
     var onReplySelected: (String) -> Void
     
@@ -51,6 +52,9 @@ struct SidebarView: View {
                         
                     case .composer:
                         draftsPreviewSection
+                        
+                    case .insights:
+                        insightsPreviewSection
                     }
                 }
                 .padding(.vertical, AppDimensions.padding)
@@ -67,6 +71,8 @@ struct SidebarView: View {
                 schedulerStatsSection
             case .composer:
                 composerStatsSection
+            case .insights:
+                insightsStatsSection
             }
         }
         .frame(width: AppDimensions.sidebarWidth)
@@ -127,13 +133,25 @@ struct SidebarView: View {
                     }
                 }
                 
-                ViewModeButton(
-                    title: "Create Post",
-                    icon: "square.and.pencil",
-                    isSelected: viewMode == .composer
-                ) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewMode = .composer
+                HStack(spacing: 8) {
+                    ViewModeButton(
+                        title: "Create Post",
+                        icon: "square.and.pencil",
+                        isSelected: viewMode == .composer
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewMode = .composer
+                        }
+                    }
+                    
+                    ViewModeButton(
+                        title: "Insights",
+                        icon: "chart.bar.fill",
+                        isSelected: viewMode == .insights
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewMode = .insights
+                        }
                     }
                 }
             }
@@ -323,6 +341,83 @@ struct SidebarView: View {
                     .font(AppTypography.title)
                     .foregroundStyle(Color.appAccent)
                 Text("Media")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+        }
+        .padding(AppDimensions.padding)
+        .background(Color.appBackground)
+    }
+    
+    // MARK: - Insights Preview Section
+    private var insightsPreviewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("QUICK STATS")
+                .font(AppTypography.sectionLabel)
+                .foregroundStyle(Color.appTextMuted)
+                .padding(.horizontal, AppDimensions.padding)
+            
+            VStack(spacing: 8) {
+                InsightStatRow(label: "Total Posts", value: "\(historyStore.totalPosts)", icon: "doc.text.fill")
+                InsightStatRow(label: "This Week", value: "\(historyStore.postsThisWeek)", icon: "calendar")
+                InsightStatRow(label: "This Month", value: "\(historyStore.postsThisMonth)", icon: "calendar.badge.clock")
+                
+                if let bestDay = historyStore.bestPerformingDay {
+                    InsightStatRow(label: "Best Day", value: bestDay, icon: "star.fill")
+                }
+            }
+            .padding(.horizontal, AppDimensions.padding)
+            
+            if !historyStore.platformBreakdown.isEmpty {
+                Divider()
+                    .background(Color.appBorder)
+                    .padding(.vertical, 4)
+                
+                Text("TOP PLATFORMS")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+                    .padding(.horizontal, AppDimensions.padding)
+                
+                VStack(spacing: 4) {
+                    ForEach(historyStore.platformBreakdown.prefix(3), id: \.0) { platform, count in
+                        HStack {
+                            Image(systemName: platform.iconName)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.appAccent)
+                            Text(platform.rawValue)
+                                .font(AppTypography.body)
+                                .foregroundStyle(Color.appText)
+                            Spacer()
+                            Text("\(count)")
+                                .font(AppTypography.bodyMedium)
+                                .foregroundStyle(Color.appAccent)
+                        }
+                        .padding(.horizontal, AppDimensions.padding)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Insights Stats Section
+    private var insightsStatsSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(historyStore.totalPosts)")
+                    .font(AppTypography.title)
+                    .foregroundStyle(Color.appText)
+                Text("Total Posts")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "%.1f", historyStore.averagePostsPerWeek))
+                    .font(AppTypography.title)
+                    .foregroundStyle(Color.appAccent)
+                Text("Avg/Week")
                     .font(AppTypography.sectionLabel)
                     .foregroundStyle(Color.appTextMuted)
             }
@@ -670,5 +765,32 @@ struct SidebarDraftRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Insight Stat Row
+struct InsightStatRow: View {
+    let label: String
+    let value: String
+    let icon: String
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 20)
+            
+            Text(label)
+                .font(AppTypography.body)
+                .foregroundStyle(Color.appTextMuted)
+            
+            Spacer()
+            
+            Text(value)
+                .font(AppTypography.bodyMedium)
+                .foregroundStyle(Color.appText)
+        }
+        .padding(.vertical, 4)
     }
 }
