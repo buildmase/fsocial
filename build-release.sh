@@ -15,8 +15,10 @@ GITHUB_REPO="buildmase/fsocial"
 cd "$PROJECT_DIR"
 
 # Get version - auto-increment patch version from last release
-LAST_VERSION=$(gh release list --repo "$GITHUB_REPO" --limit 1 | awk '{print $1}' | sed 's/v//')
-if [ -z "$LAST_VERSION" ]; then
+LAST_TAG=$(gh release list --repo "$GITHUB_REPO" --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "v0.0.0")
+LAST_VERSION="${LAST_TAG#v}"
+
+if [ -z "$LAST_VERSION" ] || [ "$LAST_VERSION" = "null" ]; then
     LAST_VERSION="0.0.0"
 fi
 
