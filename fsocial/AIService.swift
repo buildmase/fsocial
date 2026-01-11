@@ -156,23 +156,11 @@ class AIService: ObservableObject {
     }
     
     private func buildPrompt(content: String, platform: Platform) -> String {
-        let platformName = platform.rawValue
-        let characterLimit = platform.characterLimit
-        
         return """
-        You are a social media expert helping generate engaging replies for \(platformName).
+        Reply to this \(platform.rawValue) post:
+        "\(content.prefix(500))"
         
-        The user is viewing this content:
-        "\(content.prefix(1000))"
-        
-        Generate 4 short, authentic reply options that:
-        - Are relevant to the content above
-        - Sound natural and conversational (not robotic)
-        - Are appropriate for \(platformName)
-        - Are under \(min(characterLimit, 280)) characters each
-        - Include a mix of: supportive, insightful, funny, or engaging tones
-        
-        Return ONLY the 4 replies, one per line, no numbering or bullets.
+        Give 3 short replies (under 100 chars each). One supportive, one witty, one insightful. No bullets or numbers, just the replies on separate lines.
         """
     }
     
@@ -189,7 +177,7 @@ class AIService: ObservableObject {
         
         let body: [String: Any] = [
             "model": "claude-sonnet-4-20250514",
-            "max_tokens": 300,
+            "max_tokens": 150,
             "messages": [
                 ["role": "user", "content": prompt]
             ]
@@ -237,7 +225,7 @@ class AIService: ObservableObject {
             "messages": [
                 ["role": "user", "content": prompt]
             ],
-            "max_tokens": 300,
+            "max_tokens": 150,
             "temperature": 0.8
         ]
         
@@ -284,7 +272,7 @@ class AIService: ObservableObject {
             "messages": [
                 ["role": "user", "content": prompt]
             ],
-            "max_tokens": 300,
+            "max_tokens": 150,
             "temperature": 0.8
         ]
         
@@ -421,7 +409,7 @@ class AIService: ObservableObject {
                 return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             .filter { !$0.isEmpty && $0.count > 5 }
-            .prefix(4)
+            .prefix(3)
             .map { String($0) }
     }
 }

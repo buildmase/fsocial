@@ -47,8 +47,8 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     }
     
     func injectText(_ text: String) {
-        // JavaScript to find active text field and insert text
-        // Modern platforms like X use Draft.js editors - we need special handling
+        // JavaScript to find reply box and insert text
+        // First tries to click reply button, then injects text
         let escapedText = text
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
@@ -130,7 +130,39 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
                 }
             }
             
-            // X/Twitter specific: find the compose box
+            var hostname = window.location.hostname;
+            
+            // X/Twitter specific
+            if (hostname.includes('x.com') || hostname.includes('twitter.com')) {
+                // Try to find and click the reply button first
+                var replyButton = document.querySelector('[data-testid="reply"]');
+                if (replyButton && !document.querySelector('[data-testid="tweetTextarea_0"]')) {
+                    replyButton.click();
+                    // Wait for reply box to appear, then inject
+                    setTimeout(function() {
+                        var replyBox = document.querySelector('[data-testid="tweetTextarea_0"]') ||
+                                       document.querySelector('[role="textbox"][contenteditable="true"]');
+                        if (replyBox) {
+                            replyBox.focus();
+                            document.execCommand('insertText', false, text);
+                            replyBox.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    }, 500);
+                    return true;
+                }
+                
+                // Reply box already open
+                var xCompose = document.querySelector('[data-testid="tweetTextarea_0"]') || 
+                               document.querySelector('[data-testid="tweetTextarea_0_label"]')?.querySelector('[contenteditable="true"]') ||
+                               document.querySelector('[aria-label="Post text"]') ||
+                               document.querySelector('[aria-label="Tweet text"]') ||
+                               document.querySelector('[role="textbox"][contenteditable="true"]');
+                if (xCompose) {
+                    return handleContentEditable(xCompose);
+                }
+            }
+            
+            // X/Twitter fallback: find the compose box
             var xCompose = document.querySelector('[data-testid="tweetTextarea_0"]') || 
                            document.querySelector('[data-testid="tweetTextarea_0_label"]')?.querySelector('[contenteditable="true"]') ||
                            document.querySelector('[aria-label="Post text"]') ||
