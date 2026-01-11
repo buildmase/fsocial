@@ -15,6 +15,8 @@ enum Platform: String, CaseIterable, Identifiable, Codable {
     case tiktok = "TikTok"
     case facebook = "Facebook"
     case linkedin = "LinkedIn"
+    case letterboxd = "Letterboxd"
+    case goodreads = "Goodreads"
     
     var id: String { rawValue }
     
@@ -32,6 +34,10 @@ enum Platform: String, CaseIterable, Identifiable, Codable {
             return URL(string: "https://facebook.com")!
         case .linkedin:
             return URL(string: "https://linkedin.com")!
+        case .letterboxd:
+            return URL(string: "https://letterboxd.com")!
+        case .goodreads:
+            return URL(string: "https://goodreads.com")!
         }
     }
     
@@ -49,6 +55,10 @@ enum Platform: String, CaseIterable, Identifiable, Codable {
             return "person.2.circle.fill"
         case .linkedin:
             return "briefcase.circle.fill"
+        case .letterboxd:
+            return "film.circle.fill"
+        case .goodreads:
+            return "book.circle.fill"
         }
     }
 }
