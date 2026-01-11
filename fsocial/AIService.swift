@@ -157,10 +157,23 @@ class AIService: ObservableObject {
     
     private func buildPrompt(content: String, platform: Platform) -> String {
         return """
-        Reply to this \(platform.rawValue) post:
-        "\(content.prefix(500))"
+        You're replying to this \(platform.rawValue) post as a real person. Be authentic and conversational.
         
-        Give 3 short replies (under 100 chars each). One supportive, one witty, one insightful. No bullets or numbers, just the replies on separate lines.
+        POST: "\(content.prefix(400))"
+        
+        Write 3 different reply options (each under 80 chars):
+        - One genuine/supportive
+        - One clever/witty  
+        - One adds value/insight
+        
+        Rules:
+        - Sound human, not corporate
+        - NO emojis ever
+        - No hashtags
+        - Lowercase okay, be casual
+        - Match the vibe of the original post
+        
+        Just the 3 replies, one per line. No labels or numbers.
         """
     }
     
@@ -406,11 +419,31 @@ class AIService: ObservableObject {
                 if cleaned.hasPrefix("- ") { cleaned.removeFirst(2) }
                 if cleaned.hasPrefix("• ") { cleaned.removeFirst(2) }
                 if cleaned.hasPrefix("* ") { cleaned.removeFirst(2) }
+                // Remove any emojis
+                cleaned = removeEmojis(from: cleaned)
                 return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             .filter { !$0.isEmpty && $0.count > 5 }
             .prefix(3)
             .map { String($0) }
+    }
+    
+    private func removeEmojis(from text: String) -> String {
+        return text.unicodeScalars
+            .filter { scalar in
+                // Keep basic ASCII, extended Latin, punctuation
+                let value = scalar.value
+                // Basic Latin + Latin Extended + common punctuation
+                if value <= 0x024F { return true }
+                // General punctuation
+                if value >= 0x2000 && value <= 0x206F { return true }
+                // Skip emojis and symbols
+                if value >= 0x1F300 { return false }
+                if value >= 0x2600 && value <= 0x27BF { return false }
+                return true
+            }
+            .map { String($0) }
+            .joined()
     }
 }
 
