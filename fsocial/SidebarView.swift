@@ -11,6 +11,7 @@ struct SidebarView: View {
     @Binding var selectedPlatform: Platform
     @ObservedObject var replyStore: QuickReplyStore
     @ObservedObject var scheduleStore: ScheduleStore
+    @ObservedObject var draftStore: DraftStore
     @Binding var viewMode: ViewMode
     var onReplySelected: (String) -> Void
     
@@ -35,18 +36,21 @@ struct SidebarView: View {
                     Divider()
                         .background(Color.appBorder)
                     
-                    // Platforms (only show in browser mode)
-                    if viewMode == .browser {
+                    // Content based on view mode
+                    switch viewMode {
+                    case .browser:
                         platformsSection
                         
                         Divider()
                             .background(Color.appBorder)
                         
-                        // Quick Replies
                         quickRepliesSection
-                    } else {
-                        // Upcoming posts preview in scheduler mode
+                        
+                    case .scheduler:
                         upcomingPostsSection
+                        
+                    case .composer:
+                        draftsPreviewSection
                     }
                 }
                 .padding(.vertical, AppDimensions.padding)
@@ -55,11 +59,14 @@ struct SidebarView: View {
             Divider()
                 .background(Color.appBorder)
             
-            // Bottom button
-            if viewMode == .browser {
+            // Bottom button based on view mode
+            switch viewMode {
+            case .browser:
                 addReplyButton
-            } else {
+            case .scheduler:
                 schedulerStatsSection
+            case .composer:
+                composerStatsSection
             }
         }
         .frame(width: AppDimensions.sidebarWidth)
@@ -97,24 +104,36 @@ struct SidebarView: View {
                 .foregroundStyle(Color.appTextMuted)
                 .padding(.horizontal, AppDimensions.padding)
             
-            HStack(spacing: 8) {
-                ViewModeButton(
-                    title: "Platforms",
-                    icon: "globe",
-                    isSelected: viewMode == .browser
-                ) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewMode = .browser
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    ViewModeButton(
+                        title: "Platforms",
+                        icon: "globe",
+                        isSelected: viewMode == .browser
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewMode = .browser
+                        }
+                    }
+                    
+                    ViewModeButton(
+                        title: "Calendar",
+                        icon: "calendar",
+                        isSelected: viewMode == .scheduler
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewMode = .scheduler
+                        }
                     }
                 }
                 
                 ViewModeButton(
-                    title: "Calendar",
-                    icon: "calendar",
-                    isSelected: viewMode == .scheduler
+                    title: "Create Post",
+                    icon: "square.and.pencil",
+                    isSelected: viewMode == .composer
                 ) {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        viewMode = .scheduler
+                        viewMode = .composer
                     }
                 }
             }
@@ -247,6 +266,63 @@ struct SidebarView: View {
                     .font(AppTypography.title)
                     .foregroundStyle(Color.appAccent)
                 Text("Today")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+        }
+        .padding(AppDimensions.padding)
+        .background(Color.appBackground)
+    }
+    
+    // MARK: - Drafts Preview Section
+    private var draftsPreviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SAVED DRAFTS")
+                .font(AppTypography.sectionLabel)
+                .foregroundStyle(Color.appTextMuted)
+                .padding(.horizontal, AppDimensions.padding)
+            
+            if draftStore.drafts.isEmpty {
+                Text("No saved drafts")
+                    .font(AppTypography.body)
+                    .foregroundStyle(Color.appTextMuted)
+                    .padding(.horizontal, AppDimensions.padding)
+            } else {
+                ForEach(draftStore.drafts.prefix(5)) { draft in
+                    SidebarDraftRow(draft: draft) {
+                        draftStore.loadDraft(draft)
+                    }
+                }
+                
+                if draftStore.drafts.count > 5 {
+                    Text("+\(draftStore.drafts.count - 5) more")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                        .padding(.horizontal, AppDimensions.padding)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Composer Stats Section
+    private var composerStatsSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(draftStore.drafts.count)")
+                    .font(AppTypography.title)
+                    .foregroundStyle(Color.appText)
+                Text("Drafts")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(draftStore.currentDraft.media.count)")
+                    .font(AppTypography.title)
+                    .foregroundStyle(Color.appAccent)
+                Text("Media")
                     .font(AppTypography.sectionLabel)
                     .foregroundStyle(Color.appTextMuted)
             }
@@ -552,5 +628,47 @@ struct QuickReplyRow: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+// MARK: - Sidebar Draft Row
+struct SidebarDraftRow: View {
+    let draft: DraftPost
+    let onSelect: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(draft.previewText)
+                    .font(AppTypography.body)
+                    .foregroundStyle(Color.appText)
+                    .lineLimit(2)
+                
+                HStack(spacing: 8) {
+                    Text(draft.formattedDate)
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                    
+                    if !draft.media.isEmpty {
+                        HStack(spacing: 2) {
+                            Image(systemName: "photo")
+                                .font(.system(size: 10))
+                            Text("\(draft.media.count)")
+                                .font(AppTypography.sectionLabel)
+                        }
+                        .foregroundStyle(Color.appTextMuted)
+                    }
+                }
+            }
+            .padding(.horizontal, AppDimensions.padding)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isHovered ? Color.appSecondary : Color.clear)
+            .cornerRadius(AppDimensions.borderRadius)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }

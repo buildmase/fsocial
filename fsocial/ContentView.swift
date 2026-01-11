@@ -11,12 +11,14 @@ import AppKit
 enum ViewMode {
     case browser
     case scheduler
+    case composer
 }
 
 struct ContentView: View {
     @State private var selectedPlatform: Platform = .x
     @StateObject private var replyStore = QuickReplyStore()
     @StateObject private var scheduleStore = ScheduleStore()
+    @StateObject private var draftStore = DraftStore()
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var viewMode: ViewMode = .browser
@@ -31,6 +33,7 @@ struct ContentView: View {
                 selectedPlatform: $selectedPlatform,
                 replyStore: replyStore,
                 scheduleStore: scheduleStore,
+                draftStore: draftStore,
                 viewMode: $viewMode,
                 onReplySelected: handleReplySelected
             )
@@ -54,6 +57,18 @@ struct ContentView: View {
                 if viewMode == .scheduler {
                     SchedulerView(scheduleStore: scheduleStore)
                         .transition(.opacity)
+                }
+                
+                // Composer view
+                if viewMode == .composer {
+                    ComposerView(
+                        draftStore: draftStore,
+                        onSwitchToPlatform: { platform in
+                            selectedPlatform = platform
+                            viewMode = .browser
+                        }
+                    )
+                    .transition(.opacity)
                 }
             }
         }

@@ -138,3 +138,65 @@ struct ScheduledPost: Identifiable, Codable, Equatable {
         return formatter.string(from: scheduledDate)
     }
 }
+
+// MARK: - Media Item
+struct MediaItem: Identifiable, Codable, Equatable {
+    let id: UUID
+    var fileName: String
+    var fileExtension: String
+    var isVideo: Bool
+    var bookmarkData: Data? // Security-scoped bookmark for file access
+    
+    init(id: UUID = UUID(), fileName: String, fileExtension: String, isVideo: Bool, bookmarkData: Data? = nil) {
+        self.id = id
+        self.fileName = fileName
+        self.fileExtension = fileExtension
+        self.isVideo = isVideo
+        self.bookmarkData = bookmarkData
+    }
+    
+    var displayName: String {
+        "\(fileName).\(fileExtension)"
+    }
+    
+    var iconName: String {
+        isVideo ? "video.fill" : "photo.fill"
+    }
+}
+
+// MARK: - Draft Post
+struct DraftPost: Identifiable, Codable, Equatable {
+    let id: UUID
+    var content: String
+    var platforms: [Platform]
+    var media: [MediaItem]
+    var createdAt: Date
+    var updatedAt: Date
+    
+    init(id: UUID = UUID(), content: String = "", platforms: [Platform] = [], media: [MediaItem] = [], createdAt: Date = Date(), updatedAt: Date = Date()) {
+        self.id = id
+        self.content = content
+        self.platforms = platforms
+        self.media = media
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
+    var isEmpty: Bool {
+        content.isEmpty && media.isEmpty
+    }
+    
+    var previewText: String {
+        if content.isEmpty {
+            return media.isEmpty ? "Empty draft" : "\(media.count) media item(s)"
+        }
+        return String(content.prefix(50)) + (content.count > 50 ? "..." : "")
+    }
+    
+    var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter.string(from: updatedAt)
+    }
+}
