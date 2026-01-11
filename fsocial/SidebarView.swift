@@ -135,7 +135,7 @@ struct SidebarView: View {
                 
                 HStack(spacing: 8) {
                     ViewModeButton(
-                        title: "Create Post",
+                        title: "Create",
                         icon: "square.and.pencil",
                         isSelected: viewMode == .composer
                     ) {
@@ -523,17 +523,18 @@ struct ViewModeButton: View {
     let icon: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                 Text(title)
                     .font(AppTypography.body)
+                    .lineLimit(1)
             }
             .foregroundStyle(isSelected ? Color.white : Color.appTextMuted)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .background(isSelected ? Color.appAccent : Color.appSecondary)
