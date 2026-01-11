@@ -23,9 +23,11 @@ struct ContentView: View {
     @StateObject private var hashtagStore = HashtagStore()
     @StateObject private var historyStore = HistoryStore()
     @StateObject private var aiService = AIService()
+    @StateObject private var updateChecker = UpdateChecker()
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var viewMode: ViewMode = .browser
+    @State private var showUpdateAlert = false
     
     // Coordinators for each platform (keeps WebViews alive)
     @State private var coordinators: [Platform: WebViewCoordinator] = [:]
@@ -92,6 +94,18 @@ struct ContentView: View {
         }
         .background(Color.appBackground)
         .toast(isShowing: $showToast, message: toastMessage)
+        .onAppear {
+            // Check for updates on launch
+            updateChecker.checkForUpdates()
+        }
+        .onReceive(updateChecker.$updateAvailable) { available in
+            if available {
+                showUpdateAlert = true
+            }
+        }
+        .sheet(isPresented: $showUpdateAlert) {
+            UpdateAlertView(updateChecker: updateChecker, isPresented: $showUpdateAlert)
+        }
     }
     
     // MARK: - Get or Create Coordinator
