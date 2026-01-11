@@ -2,6 +2,7 @@
 
 # Social Hub - Release Build Script
 # This script builds, signs, notarizes, packages, and publishes the app
+# Builds Universal Binary for both Intel and Apple Silicon Macs
 
 set -e
 
@@ -32,10 +33,18 @@ echo "Building Social Hub v$NEW_VERSION"
 echo "============================================"
 echo ""
 
-echo "[1/7] Building release..."
-xcodebuild -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -configuration Release clean build 2>&1 | grep -E "(BUILD|error:|warning:)" || true
+echo "[1/7] Building Universal Binary (Intel + Apple Silicon)..."
+xcodebuild -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -configuration Release clean build \
+    ARCHS="x86_64 arm64" \
+    ONLY_ACTIVE_ARCH=NO \
+    2>&1 | grep -E "(BUILD|error:|warning:)" || true
 
 APP_PATH="/Users/masdawg/Library/Developer/Xcode/DerivedData/fsocial-axyvdsothnptwbhfditbzvrlwnsd/Build/Products/Release/$APP_NAME.app"
+
+# Verify it's Universal
+echo ""
+echo "Verifying Universal Binary..."
+file "$APP_PATH/Contents/MacOS/$APP_NAME"
 
 echo ""
 echo "[2/7] Signing with Developer ID..."
@@ -74,7 +83,7 @@ echo "[7/7] Publishing to GitHub..."
 gh release create "v$NEW_VERSION" \
   --repo "$GITHUB_REPO" \
   --title "Social Hub v$NEW_VERSION" \
-  --notes "Release v$NEW_VERSION" \
+  --notes "Release v$NEW_VERSION - Universal Binary (Intel + Apple Silicon)" \
   "$DMG_PATH"
 
 echo ""
