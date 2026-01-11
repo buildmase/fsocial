@@ -172,20 +172,88 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
                 return handleContentEditable(xCompose);
             }
             
-            // Instagram/Threads: find comment box
-            var instaComment = document.querySelector('textarea[aria-label*="comment"]') ||
-                               document.querySelector('textarea[placeholder*="comment"]') ||
-                               document.querySelector('form textarea');
-            if (instaComment) {
-                return handleStandardInput(instaComment);
+            // Instagram specific
+            if (hostname.includes('instagram.com')) {
+                var instaComment = document.querySelector('textarea[aria-label*="comment"]') ||
+                                   document.querySelector('textarea[placeholder*="comment"]') ||
+                                   document.querySelector('textarea[placeholder*="Add a comment"]') ||
+                                   document.querySelector('form textarea');
+                if (instaComment) {
+                    return handleStandardInput(instaComment);
+                }
             }
             
-            // LinkedIn: find message/post box
-            var linkedinBox = document.querySelector('[contenteditable="true"][role="textbox"]') ||
-                              document.querySelector('.ql-editor') ||
-                              document.querySelector('[data-placeholder]');
-            if (linkedinBox) {
-                return handleContentEditable(linkedinBox);
+            // Threads specific
+            if (hostname.includes('threads.net')) {
+                var threadsBox = document.querySelector('[contenteditable="true"]') ||
+                                 document.querySelector('textarea');
+                if (threadsBox) {
+                    if (threadsBox.tagName === 'TEXTAREA') {
+                        return handleStandardInput(threadsBox);
+                    } else {
+                        return handleContentEditable(threadsBox);
+                    }
+                }
+            }
+            
+            // TikTok specific
+            if (hostname.includes('tiktok.com')) {
+                // TikTok comment box
+                var tiktokComment = document.querySelector('[data-e2e="comment-input"]') ||
+                                    document.querySelector('[contenteditable="true"]') ||
+                                    document.querySelector('div[class*="DraftEditor"]') ||
+                                    document.querySelector('textarea');
+                if (tiktokComment) {
+                    if (tiktokComment.tagName === 'TEXTAREA') {
+                        return handleStandardInput(tiktokComment);
+                    } else {
+                        return handleContentEditable(tiktokComment);
+                    }
+                }
+            }
+            
+            // Facebook specific
+            if (hostname.includes('facebook.com')) {
+                var fbComment = document.querySelector('[contenteditable="true"][role="textbox"]') ||
+                                document.querySelector('[aria-label*="comment"]') ||
+                                document.querySelector('[aria-label*="Write a comment"]') ||
+                                document.querySelector('form [contenteditable="true"]');
+                if (fbComment) {
+                    return handleContentEditable(fbComment);
+                }
+            }
+            
+            // LinkedIn specific
+            if (hostname.includes('linkedin.com')) {
+                var linkedinBox = document.querySelector('[contenteditable="true"][role="textbox"]') ||
+                                  document.querySelector('.ql-editor') ||
+                                  document.querySelector('[data-placeholder]') ||
+                                  document.querySelector('[aria-label*="Add a comment"]');
+                if (linkedinBox) {
+                    return handleContentEditable(linkedinBox);
+                }
+            }
+            
+            // Letterboxd specific
+            if (hostname.includes('letterboxd.com')) {
+                var letterboxdComment = document.querySelector('textarea#comment-text') ||
+                                        document.querySelector('textarea[name="comment"]') ||
+                                        document.querySelector('.comment-form textarea') ||
+                                        document.querySelector('textarea');
+                if (letterboxdComment) {
+                    return handleStandardInput(letterboxdComment);
+                }
+            }
+            
+            // Goodreads specific
+            if (hostname.includes('goodreads.com')) {
+                var goodreadsComment = document.querySelector('textarea#comment_body') ||
+                                       document.querySelector('textarea[name*="comment"]') ||
+                                       document.querySelector('.userReviewContents textarea') ||
+                                       document.querySelector('textarea');
+                if (goodreadsComment) {
+                    return handleStandardInput(goodreadsComment);
+                }
             }
             
             // Generic fallback: find any visible contenteditable or textarea
@@ -293,6 +361,36 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
                              document.querySelector('[class*="userContent"]');
                 if (fbPost) {
                     content = fbPost.innerText;
+                }
+            }
+            
+            // Letterboxd - get film review content
+            else if (hostname.includes('letterboxd.com')) {
+                var filmTitle = document.querySelector('.headline-1') ||
+                                document.querySelector('h1');
+                var review = document.querySelector('.review .body-text') ||
+                             document.querySelector('[class*="review-body"]') ||
+                             document.querySelector('.truncate');
+                if (filmTitle) {
+                    content = 'Film: ' + filmTitle.innerText + '\\n\\n';
+                }
+                if (review) {
+                    content += review.innerText;
+                }
+            }
+            
+            // Goodreads - get book review content
+            else if (hostname.includes('goodreads.com')) {
+                var bookTitle = document.querySelector('h1[data-testid="bookTitle"]') ||
+                                document.querySelector('h1.Text__title1');
+                var review = document.querySelector('.ReviewText__content') ||
+                             document.querySelector('[class*="reviewText"]') ||
+                             document.querySelector('.readable');
+                if (bookTitle) {
+                    content = 'Book: ' + bookTitle.innerText + '\\n\\n';
+                }
+                if (review) {
+                    content += review.innerText;
                 }
             }
             
