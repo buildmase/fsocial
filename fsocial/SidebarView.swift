@@ -225,7 +225,7 @@ struct SidebarView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "key.fill")
                             .font(.system(size: 11))
-                        Text("Add OpenAI API Key")
+                        Text("Add Claude API Key")
                             .font(AppTypography.body)
                     }
                     .foregroundStyle(Color.appAccent)
@@ -274,16 +274,16 @@ struct SidebarView: View {
     
     private var apiKeySheet: some View {
         VStack(spacing: 16) {
-            Text("OpenAI API Key")
+            Text("Claude API Key")
                 .font(AppTypography.title)
                 .foregroundStyle(Color.appText)
             
-            Text("Enter your OpenAI API key to enable AI-powered smart replies.")
+            Text("Enter your Claude API key to enable AI-powered smart replies.")
                 .font(AppTypography.body)
                 .foregroundStyle(Color.appTextMuted)
                 .multilineTextAlignment(.center)
             
-            SecureField("sk-...", text: $apiKeyInput)
+            SecureField("sk-ant-...", text: $apiKeyInput)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 300)
             

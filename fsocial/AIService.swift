@@ -10,7 +10,7 @@ import SwiftUI
 import Combine
 
 class AIService: ObservableObject {
-    private let apiKeyKey = "com.fsocial.openai.apikey"
+    private let apiKeyKey = "com.fsocial.claude.apikey"
     
     @Published var isLoading = false
     @Published var suggestedReplies: [String] = []
@@ -57,7 +57,7 @@ class AIService: ObservableObject {
         
         Task {
             do {
-                let replies = try await callOpenAI(prompt: prompt, apiKey: apiKey)
+                let replies = try await callClaude(prompt: prompt, apiKey: apiKey)
                 DispatchQueue.main.async {
                     self.suggestedReplies = replies
                     self.isLoading = false
@@ -92,21 +92,21 @@ class AIService: ObservableObject {
         """
     }
     
-    private func callOpenAI(prompt: String, apiKey: String) async throws -> [String] {
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+    private func callClaude(prompt: String, apiKey: String) async throws -> [String] {
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 300,
             "messages": [
                 ["role": "user", "content": prompt]
-            ],
-            "max_tokens": 300,
-            "temperature": 0.8
+            ]
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -119,23 +119,22 @@ class AIService: ObservableObject {
         
         if httpResponse.statusCode != 200 {
             if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let error = errorJson["error"] as? [String: Any],
-               let message = error["message"] as? String {
+               let errorObj = errorJson["error"] as? [String: Any],
+               let message = errorObj["message"] as? String {
                 throw AIError.apiError(message)
             }
             throw AIError.httpError(httpResponse.statusCode)
         }
         
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let firstChoice = choices.first,
-              let message = firstChoice["message"] as? [String: Any],
-              let content = message["content"] as? String else {
+              let content = json["content"] as? [[String: Any]],
+              let firstContent = content.first,
+              let text = firstContent["text"] as? String else {
             throw AIError.parseError
         }
         
         // Parse the response into individual replies
-        let replies = content
+        let replies = text
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
