@@ -22,6 +22,7 @@ struct ContentView: View {
     @StateObject private var draftStore = DraftStore()
     @StateObject private var hashtagStore = HashtagStore()
     @StateObject private var historyStore = HistoryStore()
+    @StateObject private var aiService = AIService()
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var viewMode: ViewMode = .browser
@@ -38,7 +39,9 @@ struct ContentView: View {
                 scheduleStore: scheduleStore,
                 draftStore: draftStore,
                 historyStore: historyStore,
+                aiService: aiService,
                 viewMode: $viewMode,
+                currentCoordinator: coordinators[selectedPlatform],
                 onReplySelected: handleReplySelected
             )
             

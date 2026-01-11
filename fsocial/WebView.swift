@@ -21,6 +21,7 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     @Published var canGoForward: Bool = false
     @Published var isLoading: Bool = false
     @Published var pageTitle: String = ""
+    @Published var extractedContent: String = ""
     
     weak var webView: WKWebView?
     
@@ -175,6 +176,116 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
         webView?.evaluateJavaScript(javascript) { _, error in
             if let error = error {
                 print("JavaScript injection error: \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Extract Content from Page
+    
+    func extractPageContent(completion: @escaping (String) -> Void) {
+        let javascript = """
+        (function() {
+            var content = '';
+            
+            // Platform-specific content extraction
+            var hostname = window.location.hostname;
+            
+            // X/Twitter - get tweet content
+            if (hostname.includes('x.com') || hostname.includes('twitter.com')) {
+                // Get the main tweet being viewed or focused tweets
+                var tweets = document.querySelectorAll('[data-testid="tweetText"]');
+                var tweetTexts = [];
+                tweets.forEach(function(tweet, index) {
+                    if (index < 3) { // Get first 3 tweets visible
+                        tweetTexts.push(tweet.innerText);
+                    }
+                });
+                content = tweetTexts.join('\\n---\\n');
+                
+                // Also try to get the author
+                var author = document.querySelector('[data-testid="User-Name"]');
+                if (author) {
+                    content = 'Author: ' + author.innerText + '\\n\\n' + content;
+                }
+            }
+            
+            // Instagram - get post caption or comments
+            else if (hostname.includes('instagram.com')) {
+                var caption = document.querySelector('h1') || document.querySelector('[class*="Caption"]');
+                if (caption) {
+                    content = caption.innerText;
+                }
+                // Get comments
+                var comments = document.querySelectorAll('ul li span');
+                var commentTexts = [];
+                comments.forEach(function(c, i) {
+                    if (i < 5 && c.innerText.length > 10) {
+                        commentTexts.push(c.innerText);
+                    }
+                });
+                if (commentTexts.length > 0) {
+                    content += '\\n\\nComments:\\n' + commentTexts.join('\\n');
+                }
+            }
+            
+            // LinkedIn - get post content
+            else if (hostname.includes('linkedin.com')) {
+                var post = document.querySelector('.feed-shared-update-v2__description') ||
+                           document.querySelector('[class*="update-components-text"]') ||
+                           document.querySelector('.break-words');
+                if (post) {
+                    content = post.innerText;
+                }
+            }
+            
+            // Threads
+            else if (hostname.includes('threads.net')) {
+                var threadPost = document.querySelector('[class*="text"]');
+                if (threadPost) {
+                    content = threadPost.innerText;
+                }
+            }
+            
+            // TikTok - get video description
+            else if (hostname.includes('tiktok.com')) {
+                var desc = document.querySelector('[data-e2e="browse-video-desc"]') ||
+                           document.querySelector('[class*="video-meta-caption"]');
+                if (desc) {
+                    content = desc.innerText;
+                }
+            }
+            
+            // Facebook
+            else if (hostname.includes('facebook.com')) {
+                var fbPost = document.querySelector('[data-ad-comet-preview="message"]') ||
+                             document.querySelector('[class*="userContent"]');
+                if (fbPost) {
+                    content = fbPost.innerText;
+                }
+            }
+            
+            // Fallback - get visible text from main content area
+            if (!content || content.length < 20) {
+                var mainContent = document.querySelector('main') || 
+                                  document.querySelector('article') ||
+                                  document.querySelector('[role="main"]');
+                if (mainContent) {
+                    content = mainContent.innerText.substring(0, 1500);
+                }
+            }
+            
+            return content.substring(0, 2000);
+        })();
+        """
+        
+        webView?.evaluateJavaScript(javascript) { [weak self] result, error in
+            DispatchQueue.main.async {
+                if let content = result as? String, !content.isEmpty {
+                    self?.extractedContent = content
+                    completion(content)
+                } else {
+                    completion("")
+                }
             }
         }
     }

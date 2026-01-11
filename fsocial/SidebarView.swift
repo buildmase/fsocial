@@ -13,13 +13,16 @@ struct SidebarView: View {
     @ObservedObject var scheduleStore: ScheduleStore
     @ObservedObject var draftStore: DraftStore
     @ObservedObject var historyStore: HistoryStore
+    @ObservedObject var aiService: AIService
     @Binding var viewMode: ViewMode
+    var currentCoordinator: WebViewCoordinator?
     var onReplySelected: (String) -> Void
     
     @State private var showingAddReply = false
     @State private var newReplyText = ""
     @State private var editingReply: QuickReply?
     @State private var editText = ""
+    @State private var showingAPIKeySheet = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -41,6 +44,11 @@ struct SidebarView: View {
                     switch viewMode {
                     case .browser:
                         platformsSection
+                        
+                        Divider()
+                            .background(Color.appBorder)
+                        
+                        aiRepliesSection
                         
                         Divider()
                             .background(Color.appBorder)
@@ -82,6 +90,9 @@ struct SidebarView: View {
         }
         .sheet(item: $editingReply) { reply in
             editReplySheet(reply: reply)
+        }
+        .sheet(isPresented: $showingAPIKeySheet) {
+            apiKeySheet
         }
     }
     
@@ -176,6 +187,142 @@ struct SidebarView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - AI Replies Section
+    private var aiRepliesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("SMART REPLIES")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+                
+                Spacer()
+                
+                if aiService.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 16, height: 16)
+                } else {
+                    Button {
+                        generateSmartReplies()
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Generate AI replies based on current content")
+                }
+            }
+            .padding(.horizontal, AppDimensions.padding)
+            
+            if !aiService.hasAPIKey {
+                // No API key configured
+                Button {
+                    showingAPIKeySheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 11))
+                        Text("Add OpenAI API Key")
+                            .font(AppTypography.body)
+                    }
+                    .foregroundStyle(Color.appAccent)
+                    .padding(.horizontal, AppDimensions.padding)
+                }
+                .buttonStyle(.plain)
+            } else if aiService.suggestedReplies.isEmpty {
+                // No suggestions yet
+                VStack(spacing: 4) {
+                    Text("Click sparkles to analyze")
+                        .font(AppTypography.body)
+                        .foregroundStyle(Color.appTextMuted)
+                    Text("current page content")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted.opacity(0.7))
+                }
+                .padding(.horizontal, AppDimensions.padding)
+            } else {
+                // Show AI suggestions
+                ForEach(aiService.suggestedReplies, id: \.self) { reply in
+                    AIReplyRow(text: reply) {
+                        onReplySelected(reply)
+                    }
+                }
+            }
+            
+            if let error = aiService.lastError {
+                Text(error)
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.red)
+                    .padding(.horizontal, AppDimensions.padding)
+            }
+        }
+    }
+    
+    private func generateSmartReplies() {
+        currentCoordinator?.extractPageContent { content in
+            if !content.isEmpty {
+                aiService.generateReplies(for: content, platform: selectedPlatform)
+            }
+        }
+    }
+    
+    // MARK: - API Key Sheet
+    @State private var apiKeyInput = ""
+    
+    private var apiKeySheet: some View {
+        VStack(spacing: 16) {
+            Text("OpenAI API Key")
+                .font(AppTypography.title)
+                .foregroundStyle(Color.appText)
+            
+            Text("Enter your OpenAI API key to enable AI-powered smart replies.")
+                .font(AppTypography.body)
+                .foregroundStyle(Color.appTextMuted)
+                .multilineTextAlignment(.center)
+            
+            SecureField("sk-...", text: $apiKeyInput)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 300)
+            
+            HStack {
+                Button("Cancel") {
+                    apiKeyInput = ""
+                    showingAPIKeySheet = false
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.appTextMuted)
+                
+                Spacer()
+                
+                Button("Save") {
+                    if !apiKeyInput.isEmpty {
+                        aiService.saveAPIKey(apiKeyInput)
+                        apiKeyInput = ""
+                        showingAPIKeySheet = false
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.appAccent)
+            }
+            .frame(width: 300)
+            
+            if aiService.hasAPIKey {
+                Divider()
+                
+                Button("Remove API Key") {
+                    aiService.clearAPIKey()
+                    showingAPIKeySheet = false
+                }
+                .foregroundStyle(Color.red)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(24)
+        .frame(width: 400)
+        .background(Color.appBackground)
     }
     
     // MARK: - Quick Replies Section
@@ -793,5 +940,36 @@ struct InsightStatRow: View {
                 .foregroundStyle(Color.appText)
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - AI Reply Row
+struct AIReplyRow: View {
+    let text: String
+    let onSelect: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.appAccent)
+                
+                Text(text)
+                    .font(AppTypography.body)
+                    .foregroundStyle(Color.appText)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(.horizontal, AppDimensions.padding)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isHovered ? Color.appAccent.opacity(0.1) : Color.clear)
+            .cornerRadius(AppDimensions.borderRadius)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
