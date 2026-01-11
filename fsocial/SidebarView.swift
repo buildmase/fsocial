@@ -24,6 +24,11 @@ struct SidebarView: View {
     @State private var editText = ""
     @State private var showingAPIKeySheet = false
     
+    // Collapsible sections
+    @AppStorage("sidebar.smartRepliesCollapsed") private var smartRepliesCollapsed = false
+    @AppStorage("sidebar.quickRepliesCollapsed") private var quickRepliesCollapsed = false
+    @AppStorage("sidebar.platformsCollapsed") private var platformsCollapsed = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Logo
@@ -173,17 +178,43 @@ struct SidebarView: View {
     // MARK: - Platforms Section
     private var platformsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("PLATFORMS")
-                .font(AppTypography.sectionLabel)
-                .foregroundStyle(Color.appTextMuted)
-                .padding(.horizontal, AppDimensions.padding)
-            
-            ForEach(Platform.allCases) { platform in
-                PlatformButton(
-                    platform: platform,
-                    isSelected: selectedPlatform == platform
-                ) {
-                    selectedPlatform = platform
+            // Collapsible Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    platformsCollapsed.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: platformsCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.appTextMuted)
+                        .frame(width: 12)
+                    
+                    Text("PLATFORMS")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                    
+                    Spacer()
+                    
+                    // Show current platform when collapsed
+                    if platformsCollapsed {
+                        Image(systemName: selectedPlatform.iconName)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, AppDimensions.padding)
+
+            if !platformsCollapsed {
+                ForEach(Platform.allCases) { platform in
+                    PlatformButton(
+                        platform: platform,
+                        isSelected: selectedPlatform == platform
+                    ) {
+                        selectedPlatform = platform
+                    }
                 }
             }
         }
@@ -192,62 +223,79 @@ struct SidebarView: View {
     // MARK: - AI Replies Section
     private var aiRepliesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("SMART REPLIES")
-                    .font(AppTypography.sectionLabel)
-                    .foregroundStyle(Color.appTextMuted)
-                
-                Spacer()
-                
-                if aiService.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                        .frame(width: 16, height: 16)
-                } else {
-                    Button {
-                        generateSmartReplies()
-                    } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.appAccent)
+            // Collapsible Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    smartRepliesCollapsed.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: smartRepliesCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.appTextMuted)
+                        .frame(width: 12)
+                    
+                    Text("SMART REPLIES")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+
+                    Spacer()
+
+                    if !smartRepliesCollapsed {
+                        if aiService.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .frame(width: 16, height: 16)
+                        } else {
+                            Button {
+                                generateSmartReplies()
+                            } label: {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.appAccent)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Generate AI replies based on current content")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .help("Generate AI replies based on current content")
                 }
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, AppDimensions.padding)
             
-            if !aiService.hasAPIKey {
-                // No API key configured
-                Button {
-                    showingAPIKeySheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "key.fill")
-                            .font(.system(size: 11))
-                        Text("Setup AI Provider")
-                            .font(AppTypography.body)
+            if !smartRepliesCollapsed {
+                if !aiService.hasAPIKey {
+                    // No API key configured
+                    Button {
+                        showingAPIKeySheet = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 11))
+                            Text("Setup AI Provider")
+                                .font(AppTypography.body)
+                        }
+                        .foregroundStyle(Color.appAccent)
+                        .padding(.horizontal, AppDimensions.padding)
                     }
-                    .foregroundStyle(Color.appAccent)
+                    .buttonStyle(.plain)
+                } else if aiService.suggestedReplies.isEmpty {
+                    // No suggestions yet
+                    VStack(spacing: 4) {
+                        Text("Click sparkles to analyze")
+                            .font(AppTypography.body)
+                            .foregroundStyle(Color.appTextMuted)
+                        Text("current page content")
+                            .font(AppTypography.sectionLabel)
+                            .foregroundStyle(Color.appTextMuted.opacity(0.7))
+                    }
                     .padding(.horizontal, AppDimensions.padding)
-                }
-                .buttonStyle(.plain)
-            } else if aiService.suggestedReplies.isEmpty {
-                // No suggestions yet
-                VStack(spacing: 4) {
-                    Text("Click sparkles to analyze")
-                        .font(AppTypography.body)
-                        .foregroundStyle(Color.appTextMuted)
-                    Text("current page content")
-                        .font(AppTypography.sectionLabel)
-                        .foregroundStyle(Color.appTextMuted.opacity(0.7))
-                }
-                .padding(.horizontal, AppDimensions.padding)
-            } else {
-                // Show AI suggestions
-                ForEach(aiService.suggestedReplies, id: \.self) { reply in
-                    AIReplyRow(text: reply) {
-                        onReplySelected(reply)
+                } else {
+                    // Show AI suggestions
+                    ForEach(aiService.suggestedReplies, id: \.self) { reply in
+                        AIReplyRow(text: reply) {
+                            onReplySelected(reply)
+                        }
                     }
                 }
             }
@@ -369,24 +417,43 @@ struct SidebarView: View {
     // MARK: - Quick Replies Section
     private var quickRepliesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("QUICK REPLIES")
-                .font(AppTypography.sectionLabel)
-                .foregroundStyle(Color.appTextMuted)
-                .padding(.horizontal, AppDimensions.padding)
-            
-            ForEach(ReplyCategory.allCases) { category in
-                ReplyCategorySection(
-                    category: category,
-                    replies: replyStore.replies(for: category),
-                    onReplySelected: onReplySelected,
-                    onEdit: { reply in
-                        editText = reply.text
-                        editingReply = reply
-                    },
-                    onDelete: { reply in
-                        replyStore.deleteReply(reply)
-                    }
-                )
+            // Collapsible Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    quickRepliesCollapsed.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: quickRepliesCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.appTextMuted)
+                        .frame(width: 12)
+                    
+                    Text("QUICK REPLIES")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                    
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, AppDimensions.padding)
+
+            if !quickRepliesCollapsed {
+                ForEach(ReplyCategory.allCases) { category in
+                    ReplyCategorySection(
+                        category: category,
+                        replies: replyStore.replies(for: category),
+                        onReplySelected: onReplySelected,
+                        onEdit: { reply in
+                            editText = reply.text
+                            editingReply = reply
+                        },
+                        onDelete: { reply in
+                            replyStore.deleteReply(reply)
+                        }
+                    )
+                }
             }
         }
     }
