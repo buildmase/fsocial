@@ -8,11 +8,18 @@
 import SwiftUI
 import AppKit
 
+enum ViewMode {
+    case browser
+    case scheduler
+}
+
 struct ContentView: View {
     @State private var selectedPlatform: Platform = .x
     @State private var replyStore = QuickReplyStore()
+    @State private var scheduleStore = ScheduleStore()
     @State private var showToast = false
     @State private var toastMessage = ""
+    @State private var viewMode: ViewMode = .browser
     
     // Coordinators for each platform (keeps WebViews alive)
     @State private var coordinators: [Platform: WebViewCoordinator] = [:]
@@ -23,21 +30,30 @@ struct ContentView: View {
             SidebarView(
                 selectedPlatform: $selectedPlatform,
                 replyStore: replyStore,
+                scheduleStore: scheduleStore,
+                viewMode: $viewMode,
                 onReplySelected: handleReplySelected
             )
             
             Divider()
                 .background(Color.appBorder)
             
-            // Browser Area
+            // Main Content Area
             ZStack {
+                // Browser views
                 ForEach(Platform.allCases) { platform in
                     BrowserView(
                         platform: platform,
                         coordinator: coordinator(for: platform)
                     )
-                    .opacity(selectedPlatform == platform ? 1 : 0)
-                    .allowsHitTesting(selectedPlatform == platform)
+                    .opacity(viewMode == .browser && selectedPlatform == platform ? 1 : 0)
+                    .allowsHitTesting(viewMode == .browser && selectedPlatform == platform)
+                }
+                
+                // Scheduler view
+                if viewMode == .scheduler {
+                    SchedulerView(scheduleStore: scheduleStore)
+                        .transition(.opacity)
                 }
             }
         }

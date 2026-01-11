@@ -8,10 +8,12 @@
 import Foundation
 
 // MARK: - Platform
-enum Platform: String, CaseIterable, Identifiable {
+enum Platform: String, CaseIterable, Identifiable, Codable {
     case x = "X"
     case instagram = "Instagram"
+    case threads = "Threads"
     case tiktok = "TikTok"
+    case facebook = "Facebook"
     case linkedin = "LinkedIn"
     
     var id: String { rawValue }
@@ -22,8 +24,12 @@ enum Platform: String, CaseIterable, Identifiable {
             return URL(string: "https://x.com")!
         case .instagram:
             return URL(string: "https://instagram.com")!
+        case .threads:
+            return URL(string: "https://threads.net")!
         case .tiktok:
             return URL(string: "https://tiktok.com")!
+        case .facebook:
+            return URL(string: "https://facebook.com")!
         case .linkedin:
             return URL(string: "https://linkedin.com")!
         }
@@ -35,8 +41,12 @@ enum Platform: String, CaseIterable, Identifiable {
             return "xmark.circle.fill"
         case .instagram:
             return "camera.circle.fill"
+        case .threads:
+            return "at.circle.fill"
         case .tiktok:
             return "music.note.tv.fill"
+        case .facebook:
+            return "person.2.circle.fill"
         case .linkedin:
             return "briefcase.circle.fill"
         }
@@ -87,4 +97,44 @@ extension QuickReply {
         QuickReply(text: "This means everything. Thank you!", category: .thanks, isDefault: true),
         QuickReply(text: "You're the best!", category: .thanks, isDefault: true),
     ]
+}
+
+// MARK: - Scheduled Post
+struct ScheduledPost: Identifiable, Codable, Equatable {
+    let id: UUID
+    var content: String
+    var platforms: [Platform]
+    var scheduledDate: Date
+    var isPosted: Bool
+    var notes: String
+    
+    init(id: UUID = UUID(), content: String, platforms: [Platform], scheduledDate: Date, isPosted: Bool = false, notes: String = "") {
+        self.id = id
+        self.content = content
+        self.platforms = platforms
+        self.scheduledDate = scheduledDate
+        self.isPosted = isPosted
+        self.notes = notes
+    }
+    
+    var isPast: Bool {
+        scheduledDate < Date()
+    }
+    
+    var isToday: Bool {
+        Calendar.current.isDateInToday(scheduledDate)
+    }
+    
+    var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: scheduledDate)
+    }
+    
+    var formattedTime: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: scheduledDate)
+    }
 }

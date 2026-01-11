@@ -10,6 +10,8 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selectedPlatform: Platform
     @Bindable var replyStore: QuickReplyStore
+    @Bindable var scheduleStore: ScheduleStore
+    @Binding var viewMode: ViewMode
     var onReplySelected: (String) -> Void
     
     @State private var showingAddReply = false
@@ -27,14 +29,25 @@ struct SidebarView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Platforms
-                    platformsSection
+                    // View Mode Toggle
+                    viewModeSection
                     
                     Divider()
                         .background(Color.appBorder)
                     
-                    // Quick Replies
-                    quickRepliesSection
+                    // Platforms (only show in browser mode)
+                    if viewMode == .browser {
+                        platformsSection
+                        
+                        Divider()
+                            .background(Color.appBorder)
+                        
+                        // Quick Replies
+                        quickRepliesSection
+                    } else {
+                        // Upcoming posts preview in scheduler mode
+                        upcomingPostsSection
+                    }
                 }
                 .padding(.vertical, AppDimensions.padding)
             }
@@ -42,8 +55,12 @@ struct SidebarView: View {
             Divider()
                 .background(Color.appBorder)
             
-            // Add Reply Button
-            addReplyButton
+            // Bottom button
+            if viewMode == .browser {
+                addReplyButton
+            } else {
+                schedulerStatsSection
+            }
         }
         .frame(width: AppDimensions.sidebarWidth)
         .background(Color.appBackground)
@@ -70,6 +87,40 @@ struct SidebarView: View {
         }
         .padding(AppDimensions.padding)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    // MARK: - View Mode Section
+    private var viewModeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("VIEW")
+                .font(AppTypography.sectionLabel)
+                .foregroundStyle(Color.appTextMuted)
+                .tracking(0.5)
+                .padding(.horizontal, AppDimensions.padding)
+            
+            HStack(spacing: 8) {
+                ViewModeButton(
+                    title: "Platforms",
+                    icon: "globe",
+                    isSelected: viewMode == .browser
+                ) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewMode = .browser
+                    }
+                }
+                
+                ViewModeButton(
+                    title: "Calendar",
+                    icon: "calendar",
+                    isSelected: viewMode == .scheduler
+                ) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewMode = .scheduler
+                    }
+                }
+            }
+            .padding(.horizontal, AppDimensions.padding)
+        }
     }
     
     // MARK: - Platforms Section
@@ -118,6 +169,52 @@ struct SidebarView: View {
         }
     }
     
+    // MARK: - Upcoming Posts Section
+    private var upcomingPostsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("UPCOMING")
+                .font(AppTypography.sectionLabel)
+                .foregroundStyle(Color.appTextMuted)
+                .tracking(0.5)
+                .padding(.horizontal, AppDimensions.padding)
+            
+            if scheduleStore.upcomingPosts.isEmpty {
+                Text("No upcoming posts")
+                    .font(AppTypography.body)
+                    .foregroundStyle(Color.appTextMuted)
+                    .padding(.horizontal, AppDimensions.padding)
+            } else {
+                ForEach(scheduleStore.upcomingPosts.prefix(5)) { post in
+                    UpcomingPostRow(post: post)
+                }
+                
+                if scheduleStore.upcomingPosts.count > 5 {
+                    Text("+\(scheduleStore.upcomingPosts.count - 5) more")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                        .padding(.horizontal, AppDimensions.padding)
+                }
+            }
+            
+            // Today's posts
+            if !scheduleStore.todaysPosts.isEmpty {
+                Divider()
+                    .background(Color.appBorder)
+                    .padding(.vertical, 8)
+                
+                Text("TODAY")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appAccent)
+                    .tracking(0.5)
+                    .padding(.horizontal, AppDimensions.padding)
+                
+                ForEach(scheduleStore.todaysPosts) { post in
+                    UpcomingPostRow(post: post, isToday: true)
+                }
+            }
+        }
+    }
+    
     // MARK: - Add Reply Button
     private var addReplyButton: some View {
         Button {
@@ -133,6 +230,33 @@ struct SidebarView: View {
             .padding(AppDimensions.padding)
         }
         .buttonStyle(.plain)
+        .background(Color.appBackground)
+    }
+    
+    // MARK: - Scheduler Stats Section
+    private var schedulerStatsSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(scheduleStore.upcomingPosts.count)")
+                    .font(AppTypography.title)
+                    .foregroundStyle(Color.appText)
+                Text("Scheduled")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(scheduleStore.todaysPosts.count)")
+                    .font(AppTypography.title)
+                    .foregroundStyle(Color.appAccent)
+                Text("Today")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+        }
+        .padding(AppDimensions.padding)
         .background(Color.appBackground)
     }
     
@@ -224,6 +348,65 @@ struct SidebarView: View {
         .padding(20)
         .frame(width: 350)
         .background(Color.appBackground)
+    }
+}
+
+// MARK: - View Mode Button
+struct ViewModeButton: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                Text(title)
+                    .font(AppTypography.body)
+            }
+            .foregroundStyle(isSelected ? Color.white : Color.appTextMuted)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
+            .background(isSelected ? Color.appAccent : Color.appSecondary)
+            .cornerRadius(AppDimensions.borderRadius)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Upcoming Post Row
+struct UpcomingPostRow: View {
+    let post: ScheduledPost
+    var isToday: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(post.formattedDate)
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(isToday ? Color.appAccent : Color.appTextMuted)
+                
+                Spacer()
+                
+                HStack(spacing: 2) {
+                    ForEach(post.platforms.prefix(3)) { platform in
+                        Image(systemName: platform.iconName)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.appTextMuted)
+                    }
+                }
+            }
+            
+            Text(post.content)
+                .font(AppTypography.body)
+                .foregroundStyle(Color.appText)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, AppDimensions.padding)
+        .padding(.vertical, 6)
     }
 }
 
