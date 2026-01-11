@@ -7,12 +7,12 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
-@Observable
-class QuickReplyStore {
+class QuickReplyStore: ObservableObject {
     private let storageKey = "com.fsocial.quickreplies"
     
-    var replies: [QuickReply] = []
+    @Published var replies: [QuickReply] = []
     
     init() {
         loadReplies()

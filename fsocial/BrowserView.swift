@@ -26,7 +26,7 @@ struct BrowserView: View {
                 .background(Color.appSecondary)
         }
         .background(Color.appBackground)
-        .onChange(of: coordinator.currentURL) { _, newURL in
+        .onChange(of: coordinator.currentURL) { newURL in
             urlText = newURL?.absoluteString ?? platform.url.absoluteString
         }
         .onAppear {

@@ -9,8 +9,8 @@ import SwiftUI
 
 struct SidebarView: View {
     @Binding var selectedPlatform: Platform
-    @Bindable var replyStore: QuickReplyStore
-    @Bindable var scheduleStore: ScheduleStore
+    @ObservedObject var replyStore: QuickReplyStore
+    @ObservedObject var scheduleStore: ScheduleStore
     @Binding var viewMode: ViewMode
     var onReplySelected: (String) -> Void
     
@@ -95,7 +95,6 @@ struct SidebarView: View {
             Text("VIEW")
                 .font(AppTypography.sectionLabel)
                 .foregroundStyle(Color.appTextMuted)
-                .tracking(0.5)
                 .padding(.horizontal, AppDimensions.padding)
             
             HStack(spacing: 8) {
@@ -129,7 +128,6 @@ struct SidebarView: View {
             Text("PLATFORMS")
                 .font(AppTypography.sectionLabel)
                 .foregroundStyle(Color.appTextMuted)
-                .tracking(0.5)
                 .padding(.horizontal, AppDimensions.padding)
             
             ForEach(Platform.allCases) { platform in
@@ -149,7 +147,6 @@ struct SidebarView: View {
             Text("QUICK REPLIES")
                 .font(AppTypography.sectionLabel)
                 .foregroundStyle(Color.appTextMuted)
-                .tracking(0.5)
                 .padding(.horizontal, AppDimensions.padding)
             
             ForEach(ReplyCategory.allCases) { category in
@@ -175,7 +172,6 @@ struct SidebarView: View {
             Text("UPCOMING")
                 .font(AppTypography.sectionLabel)
                 .foregroundStyle(Color.appTextMuted)
-                .tracking(0.5)
                 .padding(.horizontal, AppDimensions.padding)
             
             if scheduleStore.upcomingPosts.isEmpty {
@@ -205,7 +201,6 @@ struct SidebarView: View {
                 Text("TODAY")
                     .font(AppTypography.sectionLabel)
                     .foregroundStyle(Color.appAccent)
-                    .tracking(0.5)
                     .padding(.horizontal, AppDimensions.padding)
                 
                 ForEach(scheduleStore.todaysPosts) { post in
@@ -267,8 +262,10 @@ struct SidebarView: View {
                 .font(AppTypography.title)
                 .foregroundStyle(Color.appText)
             
-            TextField("Enter reply text...", text: $newReplyText, axis: .vertical)
-                .textFieldStyle(.plain)
+            TextEditor(text: $newReplyText)
+                .font(AppTypography.body)
+                .foregroundColor(Color.appText)
+                .frame(height: 80)
                 .padding(10)
                 .background(Color.appSecondary)
                 .cornerRadius(AppDimensions.borderRadius)
@@ -276,8 +273,6 @@ struct SidebarView: View {
                     RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
                         .stroke(Color.appBorder, lineWidth: 1)
                 )
-                .foregroundStyle(Color.appText)
-                .lineLimit(3...6)
             
             HStack {
                 Button("Cancel") {
@@ -313,8 +308,10 @@ struct SidebarView: View {
                 .font(AppTypography.title)
                 .foregroundStyle(Color.appText)
             
-            TextField("Reply text...", text: $editText, axis: .vertical)
-                .textFieldStyle(.plain)
+            TextEditor(text: $editText)
+                .font(AppTypography.body)
+                .foregroundColor(Color.appText)
+                .frame(height: 80)
                 .padding(10)
                 .background(Color.appSecondary)
                 .cornerRadius(AppDimensions.borderRadius)
@@ -322,8 +319,6 @@ struct SidebarView: View {
                     RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
                         .stroke(Color.appBorder, lineWidth: 1)
                 )
-                .foregroundStyle(Color.appText)
-                .lineLimit(3...6)
             
             HStack {
                 Button("Cancel") {

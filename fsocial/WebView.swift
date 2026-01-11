@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import Combine
 
 // MARK: - Shared Process Pool for Session Sharing
 class WebViewProcessPool {
@@ -14,13 +15,12 @@ class WebViewProcessPool {
 }
 
 // MARK: - WebView Coordinator
-@Observable
-class WebViewCoordinator: NSObject, WKNavigationDelegate {
-    var currentURL: URL?
-    var canGoBack: Bool = false
-    var canGoForward: Bool = false
-    var isLoading: Bool = false
-    var pageTitle: String = ""
+class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
+    @Published var currentURL: URL?
+    @Published var canGoBack: Bool = false
+    @Published var canGoForward: Bool = false
+    @Published var isLoading: Bool = false
+    @Published var pageTitle: String = ""
     
     weak var webView: WKWebView?
     
@@ -89,14 +89,14 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate {
     
     // MARK: - WKNavigationDelegate
     
-    nonisolated func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        Task { @MainActor in
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        DispatchQueue.main.async {
             self.isLoading = true
         }
     }
     
-    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        Task { @MainActor in
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        DispatchQueue.main.async {
             self.isLoading = false
             self.currentURL = webView.url
             self.canGoBack = webView.canGoBack
@@ -105,8 +105,8 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate {
         }
     }
     
-    nonisolated func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        Task { @MainActor in
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        DispatchQueue.main.async {
             self.isLoading = false
         }
     }
@@ -115,7 +115,7 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate {
 // MARK: - WebView (NSViewRepresentable)
 struct WebView: NSViewRepresentable {
     let url: URL
-    let coordinator: WebViewCoordinator
+    @ObservedObject var coordinator: WebViewCoordinator
     
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()

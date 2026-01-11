@@ -8,12 +8,12 @@
 import Foundation
 import SwiftUI
 import UserNotifications
+import Combine
 
-@Observable
-class ScheduleStore {
+class ScheduleStore: ObservableObject {
     private let storageKey = "com.fsocial.scheduledposts"
     
-    var posts: [ScheduledPost] = []
+    @Published var posts: [ScheduledPost] = []
     
     init() {
         loadPosts()
@@ -108,7 +108,7 @@ class ScheduleStore {
     private func scheduleNotification(for post: ScheduledPost) {
         let content = UNMutableNotificationContent()
         content.title = "Time to post!"
-        content.body = post.content.prefix(100) + (post.content.count > 100 ? "..." : "")
+        content.body = String(post.content.prefix(100)) + (post.content.count > 100 ? "..." : "")
         content.sound = .default
         
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: post.scheduledDate)

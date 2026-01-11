@@ -15,8 +15,8 @@ enum ViewMode {
 
 struct ContentView: View {
     @State private var selectedPlatform: Platform = .x
-    @State private var replyStore = QuickReplyStore()
-    @State private var scheduleStore = ScheduleStore()
+    @StateObject private var replyStore = QuickReplyStore()
+    @StateObject private var scheduleStore = ScheduleStore()
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var viewMode: ViewMode = .browser

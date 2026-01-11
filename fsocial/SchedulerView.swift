@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SchedulerView: View {
-    @Bindable var scheduleStore: ScheduleStore
+    @ObservedObject var scheduleStore: ScheduleStore
     @State private var selectedDate = Date()
     @State private var showingAddPost = false
     @State private var editingPost: ScheduledPost?
@@ -381,7 +381,6 @@ struct AddPostSheet: View {
                 TextEditor(text: $content)
                     .font(AppTypography.body)
                     .foregroundStyle(Color.appText)
-                    .scrollContentBackground(.hidden)
                     .frame(height: 100)
                     .padding(8)
                     .background(Color.appSecondary)
@@ -520,7 +519,6 @@ struct EditPostSheet: View {
                 TextEditor(text: $content)
                     .font(AppTypography.body)
                     .foregroundStyle(Color.appText)
-                    .scrollContentBackground(.hidden)
                     .frame(height: 100)
                     .padding(8)
                     .background(Color.appSecondary)
