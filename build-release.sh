@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Social Hub - Release Build Script
-# This script builds, signs, notarizes, and packages the app
+# This script builds, signs, notarizes, packages, and publishes the app
 
 set -e
 
@@ -10,34 +10,51 @@ APP_NAME="fsocial"
 DMG_NAME="SocialHub"
 DEVELOPER_ID="Developer ID Application: Mason Earl (3FXGJUET7Y)"
 NOTARY_PROFILE="fsocial-notary"
+GITHUB_REPO="buildmase/fsocial"
 
 cd "$PROJECT_DIR"
 
-echo "[1/6] Building release..."
+# Get version - auto-increment patch version from last release
+LAST_VERSION=$(gh release list --repo "$GITHUB_REPO" --limit 1 | awk '{print $1}' | sed 's/v//')
+if [ -z "$LAST_VERSION" ]; then
+    LAST_VERSION="0.0.0"
+fi
+
+# Parse version components
+IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
+PATCH=$((PATCH + 1))
+NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+
+echo "============================================"
+echo "Building Social Hub v$NEW_VERSION"
+echo "============================================"
+echo ""
+
+echo "[1/7] Building release..."
 xcodebuild -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -configuration Release clean build 2>&1 | grep -E "(BUILD|error:|warning:)" || true
 
 APP_PATH="/Users/masdawg/Library/Developer/Xcode/DerivedData/fsocial-axyvdsothnptwbhfditbzvrlwnsd/Build/Products/Release/$APP_NAME.app"
 
 echo ""
-echo "[2/6] Signing with Developer ID..."
+echo "[2/7] Signing with Developer ID..."
 codesign --force --deep --options runtime --sign "$DEVELOPER_ID" "$APP_PATH"
 
 echo ""
-echo "[3/6] Creating zip for notarization..."
+echo "[3/7] Creating zip for notarization..."
 ZIP_PATH="/tmp/$APP_NAME-notarize.zip"
 rm -f "$ZIP_PATH"
 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
 
 echo ""
-echo "[4/6] Submitting for notarization (this may take a minute)..."
+echo "[4/7] Submitting for notarization (this may take a minute)..."
 xcrun notarytool submit "$ZIP_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
 
 echo ""
-echo "[5/6] Stapling notarization ticket..."
+echo "[5/7] Stapling notarization ticket..."
 xcrun stapler staple "$APP_PATH"
 
 echo ""
-echo "[6/6] Creating DMG..."
+echo "[6/7] Creating DMG..."
 DMG_DIR="$PROJECT_DIR/dist"
 DMG_PATH="$DMG_DIR/$DMG_NAME.dmg"
 mkdir -p "$DMG_DIR"
@@ -51,14 +68,21 @@ rm -rf "$TEMP_DMG_DIR"
 rm -f "$ZIP_PATH"
 
 echo ""
+echo "[7/7] Publishing to GitHub..."
+gh release create "v$NEW_VERSION" \
+  --repo "$GITHUB_REPO" \
+  --title "Social Hub v$NEW_VERSION" \
+  --notes "Release v$NEW_VERSION" \
+  "$DMG_PATH"
+
+echo ""
 echo "============================================"
-echo "BUILD COMPLETE"
+echo "BUILD AND PUBLISH COMPLETE"
 echo "============================================"
 echo ""
-echo "Verifying signature..."
-spctl --assess --type execute -v "$APP_PATH"
+echo "Version: v$NEW_VERSION"
+echo "DMG: $DMG_PATH"
+echo "Release: https://github.com/$GITHUB_REPO/releases/tag/v$NEW_VERSION"
 echo ""
-echo "DMG ready at: $DMG_PATH"
-ls -lh "$DMG_PATH"
-echo ""
-echo "Upload this file to your website."
+echo "Direct download URL:"
+echo "https://github.com/$GITHUB_REPO/releases/latest/download/$DMG_NAME.dmg"
