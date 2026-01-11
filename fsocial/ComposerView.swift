@@ -13,6 +13,7 @@ struct ComposerView: View {
     @ObservedObject var draftStore: DraftStore
     @ObservedObject var hashtagStore: HashtagStore
     @ObservedObject var historyStore: HistoryStore
+    @ObservedObject var aiService: AIService
     var onSwitchToPlatform: (Platform) -> Void
     
     @State private var showingMediaPicker = false
@@ -21,6 +22,13 @@ struct ComposerView: View {
     @State private var currentPostingPlatform: Platform?
     @State private var selectedHashtags: [String] = []
     @State private var showHashtagPicker = false
+    
+    // AI Assistant
+    @State private var aiPrompt = ""
+    @State private var aiSuggestions: [String] = []
+    @State private var isAILoading = false
+    @State private var showAIAssistant = true
+    @AppStorage("composer.aiAssistantCollapsed") private var aiAssistantCollapsed = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -47,6 +55,7 @@ struct ComposerView: View {
         .sheet(isPresented: $showingPostFlow) {
             PostFlowSheet(
                 draftStore: draftStore,
+                historyStore: historyStore,
                 onSwitchToPlatform: onSwitchToPlatform
             )
         }
@@ -135,6 +144,9 @@ struct ComposerView: View {
     private var composerArea: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // AI Assistant Section
+                aiAssistantSection
+                
                 // Platform Selection
                 platformSelection
                 
@@ -152,6 +164,328 @@ struct ComposerView: View {
             }
             .padding(AppDimensions.padding)
         }
+    }
+    
+    // MARK: - AI Assistant Section
+    private var aiAssistantSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Collapsible Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    aiAssistantCollapsed.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: aiAssistantCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.appTextMuted)
+                        .frame(width: 12)
+                    
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.appAccent)
+                    
+                    Text("AI ASSISTANT")
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appTextMuted)
+                    
+                    Spacer()
+                    
+                    if !aiService.hasAPIKey {
+                        Text("No API key")
+                            .font(AppTypography.sectionLabel)
+                            .foregroundStyle(Color.appTextMuted.opacity(0.5))
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            
+            if !aiAssistantCollapsed {
+                if !aiService.hasAPIKey {
+                    // No API key message
+                    HStack {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appTextMuted)
+                        Text("Add an API key in the sidebar to use AI assistant")
+                            .font(AppTypography.body)
+                            .foregroundStyle(Color.appTextMuted)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.appSecondary.opacity(0.5))
+                    .cornerRadius(AppDimensions.borderRadius)
+                } else {
+                    // AI Input
+                    VStack(spacing: 12) {
+                        HStack(spacing: 8) {
+                            TextField("Ask AI to help write your post...", text: $aiPrompt)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 14))
+                                .foregroundColor(Color.appText)
+                                .padding(10)
+                                .background(Color.appSecondary)
+                                .cornerRadius(AppDimensions.borderRadius)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
+                                        .stroke(Color.appBorder, lineWidth: 1)
+                                )
+                                .onSubmit {
+                                    generateAIContent()
+                                }
+                            
+                            Button {
+                                generateAIContent()
+                            } label: {
+                                if isAILoading {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 32, height: 32)
+                                } else {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(aiPrompt.isEmpty ? Color.appTextMuted : Color.appAccent)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(aiPrompt.isEmpty || isAILoading)
+                        }
+                        
+                        // Quick prompts
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                QuickPromptButton(text: "Write a post about...") {
+                                    aiPrompt = "Write a post about "
+                                }
+                                QuickPromptButton(text: "Make it more engaging") {
+                                    if !draftStore.currentDraft.content.isEmpty {
+                                        aiPrompt = "Make this more engaging: \(draftStore.currentDraft.content.prefix(200))"
+                                        generateAIContent()
+                                    }
+                                }
+                                QuickPromptButton(text: "Add a hook") {
+                                    if !draftStore.currentDraft.content.isEmpty {
+                                        aiPrompt = "Add a compelling hook to this: \(draftStore.currentDraft.content.prefix(200))"
+                                        generateAIContent()
+                                    }
+                                }
+                                QuickPromptButton(text: "Shorten it") {
+                                    if !draftStore.currentDraft.content.isEmpty {
+                                        aiPrompt = "Make this shorter and punchier: \(draftStore.currentDraft.content.prefix(300))"
+                                        generateAIContent()
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // AI Suggestions
+                        if !aiSuggestions.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Suggestions")
+                                    .font(AppTypography.sectionLabel)
+                                    .foregroundStyle(Color.appTextMuted)
+                                
+                                ForEach(aiSuggestions.indices, id: \.self) { index in
+                                    AISuggestionRow(
+                                        text: aiSuggestions[index],
+                                        onUse: {
+                                            draftStore.currentDraft.content = aiSuggestions[index]
+                                        },
+                                        onAppend: {
+                                            if draftStore.currentDraft.content.isEmpty {
+                                                draftStore.currentDraft.content = aiSuggestions[index]
+                                            } else {
+                                                draftStore.currentDraft.content += "\n\n" + aiSuggestions[index]
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            .padding(12)
+                            .background(Color.appSecondary.opacity(0.3))
+                            .cornerRadius(AppDimensions.borderRadius)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Generate AI Content
+    private func generateAIContent() {
+        guard !aiPrompt.isEmpty, aiService.hasAPIKey else { return }
+        
+        isAILoading = true
+        
+        let platform = draftStore.currentDraft.platforms.first ?? .x
+        let prompt = buildContentPrompt(userRequest: aiPrompt, platform: platform)
+        
+        // Use the AI service to generate content
+        Task {
+            do {
+                let suggestions = try await generateWithAI(prompt: prompt)
+                DispatchQueue.main.async {
+                    self.aiSuggestions = suggestions
+                    self.isAILoading = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isAILoading = false
+                }
+            }
+        }
+    }
+    
+    private func buildContentPrompt(userRequest: String, platform: Platform) -> String {
+        return """
+        You're a social media content creator. Write post content for \(platform.rawValue).
+        
+        User request: \(userRequest)
+        
+        Character limit: \(platform.characterLimit)
+        
+        Write 3 different post options. Each should be:
+        - Under the character limit
+        - Engaging and authentic
+        - NO emojis
+        - Natural, human voice
+        
+        Just the 3 posts, one per line. No labels or numbers.
+        """
+    }
+    
+    private func generateWithAI(prompt: String) async throws -> [String] {
+        guard let apiKey = aiService.getAPIKey() else {
+            throw AIError.apiError("No API key")
+        }
+        
+        let url: URL
+        var request: URLRequest
+        let body: [String: Any]
+        
+        switch aiService.selectedProvider {
+        case .claude:
+            url = URL(string: "https://api.anthropic.com/v1/messages")!
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = [
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 500,
+                "messages": [["role": "user", "content": prompt]]
+            ]
+            
+        case .openai:
+            url = URL(string: "https://api.openai.com/v1/chat/completions")!
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = [
+                "model": "gpt-4o-mini",
+                "messages": [["role": "user", "content": prompt]],
+                "max_tokens": 500
+            ]
+            
+        case .grok:
+            url = URL(string: "https://api.x.ai/v1/chat/completions")!
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = [
+                "model": "grok-beta",
+                "messages": [["role": "user", "content": prompt]],
+                "max_tokens": 500
+            ]
+            
+        case .gemini:
+            url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=\(apiKey)")!
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = [
+                "contents": [["parts": [["text": prompt]]]],
+                "generationConfig": ["maxOutputTokens": 500]
+            ]
+            
+        case .ollama:
+            let urlString = apiKey.hasSuffix("/") ? "\(apiKey)api/generate" : "\(apiKey)/api/generate"
+            url = URL(string: urlString)!
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            body = [
+                "model": "llama3.2",
+                "prompt": prompt,
+                "stream": false
+            ]
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        
+        // Parse response based on provider
+        let text: String
+        switch aiService.selectedProvider {
+        case .claude:
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let content = json["content"] as? [[String: Any]],
+                  let first = content.first,
+                  let t = first["text"] as? String else {
+                throw AIError.parseError
+            }
+            text = t
+            
+        case .openai, .grok:
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let first = choices.first,
+                  let message = first["message"] as? [String: Any],
+                  let t = message["content"] as? String else {
+                throw AIError.parseError
+            }
+            text = t
+            
+        case .gemini:
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let candidates = json["candidates"] as? [[String: Any]],
+                  let first = candidates.first,
+                  let content = first["content"] as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]],
+                  let firstPart = parts.first,
+                  let t = firstPart["text"] as? String else {
+                throw AIError.parseError
+            }
+            text = t
+            
+        case .ollama:
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let t = json["response"] as? String else {
+                throw AIError.parseError
+            }
+            text = t
+        }
+        
+        // Parse into separate suggestions
+        return text
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { line -> String in
+                var cleaned = line
+                if let range = cleaned.range(of: #"^[\d]+[.\)]\s*"#, options: .regularExpression) {
+                    cleaned.removeSubrange(range)
+                }
+                if cleaned.hasPrefix("- ") { cleaned.removeFirst(2) }
+                if cleaned.hasPrefix("* ") { cleaned.removeFirst(2) }
+                return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty && $0.count > 10 }
+            .prefix(3)
+            .map { String($0) }
     }
     
     // MARK: - Platform Selection
@@ -701,8 +1035,9 @@ struct DraftRow: View {
 // MARK: - Post Flow Sheet
 struct PostFlowSheet: View {
     @ObservedObject var draftStore: DraftStore
+    @ObservedObject var historyStore: HistoryStore
     var onSwitchToPlatform: (Platform) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var postedPlatforms: Set<Platform> = []
     
@@ -771,13 +1106,21 @@ struct PostFlowSheet: View {
             
             // Platform buttons
             VStack(spacing: 8) {
-                ForEach(draftStore.currentDraft.platforms) { platform in
+                ForEach(draftStore.currentDraft.platforms, id: \.self) { platform in
                     PostPlatformButton(
                         platform: platform,
                         isPosted: postedPlatforms.contains(platform)
                     ) {
                         draftStore.copyContentToClipboard()
                         postedPlatforms.insert(platform)
+                        
+                        // Save to history
+                        historyStore.addPost(
+                            draftStore.currentDraft.content,
+                            platforms: [platform],
+                            hashtags: []
+                        )
+                        
                         dismiss()
                         onSwitchToPlatform(platform)
                     }
@@ -892,5 +1235,92 @@ struct HashtagButton: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Quick Prompt Button
+struct QuickPromptButton: View {
+    let text: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(AppTypography.sectionLabel)
+                .foregroundStyle(Color.appAccent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.appAccent.opacity(0.1))
+                .cornerRadius(AppDimensions.borderRadius)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppDimensions.borderRadius)
+                        .stroke(Color.appAccent.opacity(0.3), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - AI Suggestion Row
+struct AISuggestionRow: View {
+    let text: String
+    let onUse: () -> Void
+    let onAppend: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(text)
+                .font(AppTypography.body)
+                .foregroundStyle(Color.appText)
+                .lineLimit(4)
+            
+            HStack(spacing: 8) {
+                Button {
+                    onUse()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 10))
+                        Text("Use this")
+                    }
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appAccent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.appAccent.opacity(0.1))
+                    .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                
+                Button {
+                    onAppend()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10))
+                        Text("Append")
+                    }
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.appSecondary)
+                    .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                
+                Spacer()
+                
+                Text("\(text.count) chars")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted.opacity(0.5))
+            }
+        }
+        .padding(10)
+        .background(isHovered ? Color.appSecondary : Color.clear)
+        .cornerRadius(AppDimensions.borderRadius)
+        .onHover { isHovered = $0 }
     }
 }

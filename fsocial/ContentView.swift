@@ -74,6 +74,7 @@ struct ContentView: View {
                         draftStore: draftStore,
                         hashtagStore: hashtagStore,
                         historyStore: historyStore,
+                        aiService: aiService,
                         onSwitchToPlatform: { platform in
                             selectedPlatform = platform
                             viewMode = .browser
