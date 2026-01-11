@@ -47,35 +47,127 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     
     func injectText(_ text: String) {
         // JavaScript to find active text field and insert text
+        // Modern platforms like X use Draft.js editors - we need special handling
         let escapedText = text
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\"", with: "\\\"")
         
         let javascript = """
         (function() {
-            var activeElement = document.activeElement;
-            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable)) {
-                if (activeElement.isContentEditable) {
-                    activeElement.textContent = '\(escapedText)';
-                    // Trigger input event
-                    activeElement.dispatchEvent(new Event('input', { bubbles: true }));
-                } else {
-                    activeElement.value = '\(escapedText)';
-                    activeElement.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-                return true;
+            var text = '\(escapedText)';
+            
+            // Helper to dispatch input events properly
+            function dispatchInputEvents(element) {
+                element.dispatchEvent(new Event('focus', { bubbles: true }));
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
             }
-            // Try to find any focused contenteditable div (common in modern social platforms)
-            var editables = document.querySelectorAll('[contenteditable="true"]');
-            for (var i = 0; i < editables.length; i++) {
-                if (editables[i].offsetParent !== null) {
-                    editables[i].focus();
-                    editables[i].textContent = '\(escapedText)';
-                    editables[i].dispatchEvent(new Event('input', { bubbles: true }));
+            
+            // Try execCommand first (works for contenteditable)
+            function tryExecCommand(element) {
+                element.focus();
+                // Select all existing content first
+                var selection = window.getSelection();
+                var range = document.createRange();
+                range.selectNodeContents(element);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                // Insert the text
+                var success = document.execCommand('insertText', false, text);
+                if (success) {
+                    dispatchInputEvents(element);
                     return true;
                 }
+                return false;
             }
+            
+            // Handle standard input/textarea
+            function handleStandardInput(element) {
+                element.focus();
+                element.value = text;
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+            }
+            
+            // Handle contenteditable (React/Draft.js style)
+            function handleContentEditable(element) {
+                element.focus();
+                
+                // Try execCommand first
+                if (tryExecCommand(element)) {
+                    return true;
+                }
+                
+                // Fallback: use innerHTML with proper React event simulation
+                element.innerHTML = '<span data-text="true">' + text + '</span>';
+                dispatchInputEvents(element);
+                
+                // Also try to trigger React's internal handlers
+                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                if (nativeInputValueSetter) {
+                    var hiddenTextarea = element.querySelector('textarea') || element.closest('[data-testid]')?.querySelector('textarea');
+                    if (hiddenTextarea) {
+                        nativeInputValueSetter.call(hiddenTextarea, text);
+                        hiddenTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+                
+                return true;
+            }
+            
+            // Check active element first
+            var activeElement = document.activeElement;
+            if (activeElement) {
+                if (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'INPUT') {
+                    return handleStandardInput(activeElement);
+                }
+                if (activeElement.isContentEditable || activeElement.getAttribute('contenteditable') === 'true') {
+                    return handleContentEditable(activeElement);
+                }
+            }
+            
+            // X/Twitter specific: find the compose box
+            var xCompose = document.querySelector('[data-testid="tweetTextarea_0"]') || 
+                           document.querySelector('[data-testid="tweetTextarea_0_label"]')?.querySelector('[contenteditable="true"]') ||
+                           document.querySelector('[aria-label="Post text"]') ||
+                           document.querySelector('[aria-label="Tweet text"]') ||
+                           document.querySelector('[role="textbox"][contenteditable="true"]');
+            if (xCompose) {
+                return handleContentEditable(xCompose);
+            }
+            
+            // Instagram/Threads: find comment box
+            var instaComment = document.querySelector('textarea[aria-label*="comment"]') ||
+                               document.querySelector('textarea[placeholder*="comment"]') ||
+                               document.querySelector('form textarea');
+            if (instaComment) {
+                return handleStandardInput(instaComment);
+            }
+            
+            // LinkedIn: find message/post box
+            var linkedinBox = document.querySelector('[contenteditable="true"][role="textbox"]') ||
+                              document.querySelector('.ql-editor') ||
+                              document.querySelector('[data-placeholder]');
+            if (linkedinBox) {
+                return handleContentEditable(linkedinBox);
+            }
+            
+            // Generic fallback: find any visible contenteditable or textarea
+            var editables = document.querySelectorAll('[contenteditable="true"], textarea:not([hidden])');
+            for (var i = 0; i < editables.length; i++) {
+                var el = editables[i];
+                if (el.offsetParent !== null && el.offsetHeight > 0) {
+                    if (el.tagName === 'TEXTAREA') {
+                        return handleStandardInput(el);
+                    } else {
+                        return handleContentEditable(el);
+                    }
+                }
+            }
+            
             return false;
         })();
         """
