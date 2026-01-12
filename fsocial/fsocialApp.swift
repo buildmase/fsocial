@@ -16,5 +16,21 @@ struct fsocialApp: App {
                 .background(Color.appBackground)
         }
         .windowStyle(.hiddenTitleBar)
+        .commands {
+            // Replace default Help menu
+            CommandGroup(replacing: .help) {
+                Button("fsocial Help") {
+                    if let url = URL(string: "https://github.com/buildmase/fsocial") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                
+                Button("Contact Support") {
+                    if let url = URL(string: "mailto:hi@masonearl.com") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+        }
     }
 }
