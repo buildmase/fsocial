@@ -68,6 +68,9 @@ struct SidebarView: View {
                         
                     case .insights:
                         insightsPreviewSection
+                        
+                    case .settings:
+                        EmptyView()
                     }
                 }
                 .padding(.vertical, AppDimensions.padding)
@@ -86,6 +89,8 @@ struct SidebarView: View {
                 composerStatsSection
             case .insights:
                 insightsStatsSection
+            case .settings:
+                settingsInfoSection
             }
         }
         .frame(width: AppDimensions.sidebarWidth)
@@ -113,6 +118,20 @@ struct SidebarView: View {
             Text("Social Hub")
                 .font(AppTypography.title)
                 .foregroundStyle(Color.appText)
+            
+            Spacer()
+            
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewMode = .settings
+                }
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(viewMode == .settings ? Color.appAccent : Color.appTextMuted)
+            }
+            .buttonStyle(.plain)
+            .help("Settings")
         }
         .padding(AppDimensions.padding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -681,6 +700,33 @@ struct SidebarView: View {
         .background(Color.appBackground)
     }
     
+    // MARK: - Settings Info Section
+    private var settingsInfoSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(aiService.selectedProvider.rawValue.components(separatedBy: " ").first ?? "None")
+                    .font(AppTypography.bodyMedium)
+                    .foregroundStyle(Color.appText)
+                Text("AI Provider")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")
+                    .font(AppTypography.bodyMedium)
+                    .foregroundStyle(Color.appAccent)
+                Text("Version")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
+            }
+        }
+        .padding(AppDimensions.padding)
+        .background(Color.appBackground)
+    }
+
     // MARK: - Add Reply Sheet
     private var addReplySheet: some View {
         VStack(spacing: 16) {

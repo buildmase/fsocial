@@ -13,6 +13,7 @@ enum ViewMode {
     case scheduler
     case composer
     case insights
+    case settings
 }
 
 struct ContentView: View {
@@ -88,6 +89,15 @@ struct ContentView: View {
                     InsightsView(
                         historyStore: historyStore,
                         hashtagStore: hashtagStore
+                    )
+                    .transition(.opacity)
+                }
+                
+                // Settings view
+                if viewMode == .settings {
+                    SettingsView(
+                        aiService: aiService,
+                        updateChecker: updateChecker
                     )
                     .transition(.opacity)
                 }
