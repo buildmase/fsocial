@@ -450,3 +450,18 @@ struct PlatformContent: Identifiable, Codable, Equatable {
         platform.characterLimit - characterCount
     }
 }
+
+// MARK: - LinkedIn Automation Settings
+struct LinkedInAutomationSettings: Codable {
+    var interests: [String]
+    var keywords: [String]
+    var maxConnectionsPerSession: Int
+    var delayBetweenActions: Double
+    
+    init(interests: [String] = [], keywords: [String] = [], maxConnectionsPerSession: Int = 10, delayBetweenActions: Double = 2.0) {
+        self.interests = interests
+        self.keywords = keywords
+        self.maxConnectionsPerSession = maxConnectionsPerSession
+        self.delayBetweenActions = delayBetweenActions
+    }
+}

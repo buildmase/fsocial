@@ -26,11 +26,28 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     weak var webView: WKWebView?
     
     func goBack() {
-        webView?.goBack()
+        guard let webView = webView, webView.canGoBack else { return }
+        webView.goBack()
+        // Update state immediately
+        DispatchQueue.main.async {
+            self.updateNavigationState()
+        }
     }
     
     func goForward() {
-        webView?.goForward()
+        guard let webView = webView, webView.canGoForward else { return }
+        webView.goForward()
+        // Update state immediately
+        DispatchQueue.main.async {
+            self.updateNavigationState()
+        }
+    }
+    
+    private func updateNavigationState() {
+        guard let webView = webView else { return }
+        canGoBack = webView.canGoBack
+        canGoForward = webView.canGoForward
+        currentURL = webView.url
     }
     
     func reload() {
@@ -431,17 +448,213 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         DispatchQueue.main.async {
             self.isLoading = false
-            self.currentURL = webView.url
-            self.canGoBack = webView.canGoBack
-            self.canGoForward = webView.canGoForward
+            self.updateNavigationState()
             self.pageTitle = webView.title ?? ""
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        DispatchQueue.main.async {
+            self.updateNavigationState()
         }
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         DispatchQueue.main.async {
             self.isLoading = false
+            self.updateNavigationState()
         }
+    }
+    
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        DispatchQueue.main.async {
+            self.isLoading = false
+            self.updateNavigationState()
+        }
+    }
+    
+    // MARK: - LinkedIn Automation
+    
+    @Published var automationRunning = false
+    private var automationWorkItem: DispatchWorkItem?
+    
+    func startLinkedInAutomation(interests: [String], keywords: [String], maxConnections: Int, delay: Double, completion: @escaping (Int, String?) -> Void) {
+        automationRunning = true
+        var connectionsMade = 0
+        
+        let interestsJSON = try! JSONSerialization.data(withJSONObject: interests)
+        let interestsString = String(data: interestsJSON, encoding: .utf8) ?? "[]"
+        let keywordsJSON = try! JSONSerialization.data(withJSONObject: keywords)
+        let keywordsString = String(data: keywordsJSON, encoding: .utf8) ?? "[]"
+        
+        func executeStep() {
+            guard automationRunning && connectionsMade < maxConnections else {
+                automationRunning = false
+                completion(connectionsMade, nil)
+                return
+            }
+            
+            let javascript = """
+            (function() {
+                var interests = \(interestsString);
+                var keywords = \(keywordsString);
+                
+                // Scroll to load more profiles
+                window.scrollTo(0, document.body.scrollHeight);
+                
+                // Find connect buttons - try multiple selectors
+                var buttons = [];
+                
+                // Method 1: By text content
+                Array.from(document.querySelectorAll('button')).forEach(function(btn) {
+                    var text = btn.innerText.toLowerCase().trim();
+                    if ((text === 'connect' || text.includes('connect')) && 
+                        !text.includes('connected') && 
+                        !text.includes('pending') &&
+                        !text.includes('message')) {
+                        buttons.push(btn);
+                    }
+                });
+                
+                // Method 2: By aria-label
+                Array.from(document.querySelectorAll('button[aria-label*="Connect"], button[aria-label*="connect"]')).forEach(function(btn) {
+                    if (!buttons.includes(btn)) {
+                        buttons.push(btn);
+                    }
+                });
+                
+                // Method 3: By data attributes
+                Array.from(document.querySelectorAll('button[data-control-name*="connect"]')).forEach(function(btn) {
+                    if (!buttons.includes(btn)) {
+                        buttons.push(btn);
+                    }
+                });
+                
+                if (buttons.length === 0) {
+                    return JSON.stringify({ found: false, clicked: false });
+                }
+                
+                // Find first matching button based on interests/keywords
+                for (var i = 0; i < buttons.length; i++) {
+                    var button = buttons[i];
+                    
+                    // Find parent profile card
+                    var profileCard = button.closest('.entity-result__item, .reusable-search__result-container, .search-result');
+                    
+                    if (!profileCard) {
+                        var parent = button.parentElement;
+                        var attempts = 0;
+                        while (parent && attempts < 8) {
+                            if (parent.querySelector('.entity-result__title, .search-result__title, h3, [class*="name"]')) {
+                                profileCard = parent;
+                                break;
+                            }
+                            parent = parent.parentElement;
+                            attempts++;
+                        }
+                    }
+                    
+                    if (profileCard) {
+                        var profileText = profileCard.innerText.toLowerCase();
+                        var matches = false;
+                        
+                        // If no filters, match all
+                        if (interests.length === 0 && keywords.length === 0) {
+                            matches = true;
+                        } else {
+                            // Check interests
+                            for (var j = 0; j < interests.length; j++) {
+                                if (profileText.includes(interests[j].toLowerCase())) {
+                                    matches = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Check keywords
+                            if (!matches) {
+                                for (var j = 0; j < keywords.length; j++) {
+                                    if (profileText.includes(keywords[j].toLowerCase())) {
+                                        matches = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (matches) {
+                            // Scroll to button and click
+                            button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            setTimeout(function() {
+                                button.click();
+                                
+                                // Handle modal after a delay
+                                setTimeout(function() {
+                                    var sendBtn = document.querySelector('button[aria-label*="Send"], button[aria-label*="send"]');
+                                    if (sendBtn && sendBtn.innerText.toLowerCase().includes('send')) {
+                                        sendBtn.click();
+                                    }
+                                    
+                                    var dismissBtn = document.querySelector('button[aria-label*="Dismiss"], button[aria-label*="Close"]');
+                                    if (dismissBtn) {
+                                        dismissBtn.click();
+                                    }
+                                }, 800);
+                            }, 500);
+                            
+                            return JSON.stringify({ found: true, clicked: true });
+                        }
+                    }
+                }
+                
+                return JSON.stringify({ found: false, clicked: false });
+            })();
+            """
+            
+            webView?.evaluateJavaScript(javascript) { [weak self] result, error in
+                DispatchQueue.main.async {
+                    guard let self = self, self.automationRunning else {
+                        completion(connectionsMade, nil)
+                        return
+                    }
+                    
+                    if let error = error {
+                        self.automationRunning = false
+                        completion(connectionsMade, "Error: \(error.localizedDescription)")
+                        return
+                    }
+                    
+                    var clicked = false
+                    if let resultString = result as? String,
+                       let data = resultString.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        clicked = json["clicked"] as? Bool ?? false
+                    }
+                    
+                    if clicked {
+                        connectionsMade += 1
+                        // Wait before next step
+                        let workItem = DispatchWorkItem {
+                            executeStep()
+                        }
+                        self.automationWorkItem = workItem
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+                    } else {
+                        // No more buttons found, stop
+                        self.automationRunning = false
+                        completion(connectionsMade, nil)
+                    }
+                }
+            }
+        }
+        
+        // Start the automation
+        executeStep()
+    }
+    
+    func stopLinkedInAutomation() {
+        automationRunning = false
+        automationWorkItem?.cancel()
+        automationWorkItem = nil
     }
 }
 
@@ -471,9 +684,13 @@ struct WebView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        // Only reload if coordinator's webView is nil (initial load)
-        if coordinator.webView == nil {
+        // Ensure coordinator always has the webView reference
+        if coordinator.webView !== nsView {
             coordinator.webView = nsView
+            // Update navigation state when webView is set
+            DispatchQueue.main.async {
+                coordinator.updateNavigationState()
+            }
         }
     }
 }
