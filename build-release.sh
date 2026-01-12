@@ -37,6 +37,7 @@ echo "[1/7] Building Universal Binary (Intel + Apple Silicon)..."
 xcodebuild -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" -configuration Release clean build \
     ARCHS="x86_64 arm64" \
     ONLY_ACTIVE_ARCH=NO \
+    MARKETING_VERSION="$NEW_VERSION" \
     2>&1 | grep -E "(BUILD|error:|warning:)" || true
 
 APP_PATH="/Users/masdawg/Library/Developer/Xcode/DerivedData/fsocial-axyvdsothnptwbhfditbzvrlwnsd/Build/Products/Release/$APP_NAME.app"
