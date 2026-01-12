@@ -130,15 +130,247 @@ class UpdateChecker: ObservableObject {
     func installUpdate() {
         guard let dmgPath = downloadedDMGPath else { return }
         
-        // Open the DMG
-        NSWorkspace.shared.open(dmgPath)
+        // Perform automatic in-place update
+        performAutomaticUpdate(dmgPath: dmgPath)
+    }
+    
+    private func performAutomaticUpdate(dmgPath: URL) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            // Get current app path
+            let currentAppPath = Bundle.main.bundleURL
+            
+            // Get Applications folder
+            let applicationsURL = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first!
+            let appName = "fsocial.app"
+            let targetAppPath = applicationsURL.appendingPathComponent(appName)
+            
+            // Mount the DMG
+            let mountResult = self.mountDMG(at: dmgPath)
+            guard let mountPoint = mountResult else {
+                DispatchQueue.main.async {
+                    self.showError("Failed to mount DMG file")
+                }
+                return
+            }
+            
+            // Find the app bundle in the mounted DMG
+            guard let sourceAppPath = self.findAppBundle(in: mountPoint) else {
+                self.unmountDMG(at: mountPoint)
+                DispatchQueue.main.async {
+                    self.showError("Could not find app bundle in DMG")
+                }
+                return
+            }
+            
+            // Quit the app before replacing
+            DispatchQueue.main.async {
+                self.showInstallingAlert()
+                
+                // Give user a moment to see the alert, then quit and replace
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    // Replace the app
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let success = self.replaceApplication(
+                            from: sourceAppPath,
+                            to: targetAppPath,
+                            currentApp: currentAppPath
+                        )
+                        
+                        // Unmount DMG
+                        self.unmountDMG(at: mountPoint)
+                        
+                        if success {
+                            // Launch the updated app first, then quit
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                // Launch updated app
+                                self.launchUpdatedApp(at: targetAppPath)
+                                
+                                // Give it a moment to start, then quit current app
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    NSApplication.shared.terminate(nil)
+                                }
+                            }
+                        } else {
+                            DispatchQueue.main.async {
+                                self.showError("Failed to install update. The DMG has been opened - please drag the app to Applications manually.")
+                                // Fallback: open DMG for manual installation
+                                NSWorkspace.shared.open(dmgPath)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func mountDMG(at url: URL) -> URL? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = ["attach", url.path, "-nobrowse", "-mountpoint", "/Volumes/fsocial-update"]
         
-        // Show instructions
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            if process.terminationStatus == 0 {
+                return URL(fileURLWithPath: "/Volumes/fsocial-update")
+            }
+        } catch {
+            print("Failed to mount DMG: \(error)")
+        }
+        
+        return nil
+    }
+    
+    private func unmountDMG(at mountPoint: URL) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = ["detach", mountPoint.path, "-force"]
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            print("Failed to unmount DMG: \(error)")
+        }
+    }
+    
+    private func findAppBundle(in directory: URL) -> URL? {
+        let fileManager = FileManager.default
+        let appName = "fsocial.app"
+        
+        // Check root of mount point
+        let rootApp = directory.appendingPathComponent(appName)
+        if fileManager.fileExists(atPath: rootApp.path) {
+            return rootApp
+        }
+        
+        // Search recursively
+        if let enumerator = fileManager.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
+            for case let fileURL as URL in enumerator {
+                if fileURL.lastPathComponent == appName {
+                    return fileURL
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func replaceApplication(from source: URL, to destination: URL, currentApp: URL) -> Bool {
+        let fileManager = FileManager.default
+        
+        // Check if we can write to Applications folder
+        let applicationsURL = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first!
+        if !fileManager.isWritableFile(atPath: applicationsURL.path) {
+            // Try using AppleScript with admin privileges
+            return replaceApplicationWithAdmin(source: source, destination: destination)
+        }
+        
+        // Remove old app if it exists
+        do {
+            if fileManager.fileExists(atPath: destination.path) {
+                // Try to trash it first (safer)
+                var trashURL: NSURL?
+                try fileManager.trashItem(at: destination, resultingItemURL: &trashURL)
+            }
+        } catch {
+            // If trash fails, try direct removal
+            do {
+                if fileManager.fileExists(atPath: destination.path) {
+                    try fileManager.removeItem(at: destination)
+                }
+            } catch {
+                print("Failed to remove old app: \(error)")
+                // Try with admin privileges
+                return replaceApplicationWithAdmin(source: source, destination: destination)
+            }
+        }
+        
+        // Copy new app
+        do {
+            try fileManager.copyItem(at: source, to: destination)
+            
+            // Remove quarantine attribute
+            removeQuarantineAttribute(from: destination)
+            
+            return true
+        } catch {
+            print("Failed to copy app: \(error)")
+            // Try with admin privileges as fallback
+            return replaceApplicationWithAdmin(source: source, destination: destination)
+        }
+    }
+    
+    private func replaceApplicationWithAdmin(source: URL, destination: URL) -> Bool {
+        // Use osascript to run with admin privileges
+        let script = """
+        do shell script "rm -rf '\(destination.path)' && cp -R '\(source.path)' '\(destination.path)' && xattr -d com.apple.quarantine '\(destination.path)'" with administrator privileges
+        """
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            print("Failed to run admin script: \(error)")
+            return false
+        }
+    }
+    
+    private func removeQuarantineAttribute(from url: URL) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        process.arguments = ["-d", "com.apple.quarantine", url.path]
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            print("Failed to remove quarantine: \(error)")
+        }
+    }
+    
+    private func launchUpdatedApp(at appPath: URL) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        
+        NSWorkspace.shared.openApplication(at: appPath, configuration: configuration) { app, error in
+            if let error = error {
+                print("Failed to launch updated app: \(error)")
+            }
+        }
+    }
+    
+    private func showInstallingAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Installing Update"
+        alert.informativeText = "The app will restart automatically after installation completes."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func showError(_ message: String) {
+        DispatchQueue.main.async {
             let alert = NSAlert()
-            alert.messageText = "Installing Update"
-            alert.informativeText = "Drag fsocial to the Applications folder to complete the update, then relaunch the app."
-            alert.alertStyle = .informational
+            alert.messageText = "Update Failed"
+            alert.informativeText = message
+            alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")
             alert.runModal()
         }
@@ -369,7 +601,7 @@ struct UpdateAlertView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.down.circle.fill")
                                 .font(.system(size: 14))
-                            Text("Update Now")
+                            Text("Install & Restart")
                                 .font(.system(size: 14, weight: .semibold))
                         }
                         .foregroundStyle(Color.white)

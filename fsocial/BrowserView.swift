@@ -13,7 +13,7 @@ struct BrowserView: View {
     
     @State private var urlText: String = ""
     @StateObject private var automationStore = LinkedInAutomationStore()
-    @State private var showAutomationPanel = false
+    @State private var showAutomationPanel = true
     @State private var newInterest = ""
     @State private var newKeyword = ""
     @State private var showingAddInterest = false
@@ -221,11 +221,9 @@ struct BrowserView: View {
                                     .foregroundStyle(Color.appTextMuted)
                                     .padding(.vertical, 4)
                             } else {
-                                FlowLayout(spacing: 6) {
-                                    ForEach(automationStore.interests, id: \.self) { interest in
-                                        InterestTag(text: interest) {
-                                            automationStore.removeInterest(interest)
-                                        }
+                                WrappingHStack(items: automationStore.interests, spacing: 6) { interest in
+                                    InterestTag(text: interest) {
+                                        automationStore.removeInterest(interest)
                                     }
                                 }
                             }
@@ -259,11 +257,9 @@ struct BrowserView: View {
                                     .foregroundStyle(Color.appTextMuted)
                                     .padding(.vertical, 4)
                             } else {
-                                FlowLayout(spacing: 6) {
-                                    ForEach(automationStore.keywords, id: \.self) { keyword in
-                                        InterestTag(text: keyword) {
-                                            automationStore.removeKeyword(keyword)
-                                        }
+                                WrappingHStack(items: automationStore.keywords, spacing: 6) { keyword in
+                                    InterestTag(text: keyword) {
+                                        automationStore.removeKeyword(keyword)
                                     }
                                 }
                             }
@@ -464,57 +460,55 @@ struct InterestTag: View {
     }
 }
 
-// MARK: - Flow Layout
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
+// MARK: - Wrapping HStack (macOS 12.0 compatible)
+struct WrappingHStack<Item: Hashable, Content: View>: View {
+    let items: [Item]
+    let spacing: CGFloat
+    let content: (Item) -> Content
     
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(
-            in: proposal.replacingUnspecifiedDimensions().width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        return result.size
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(
-            in: bounds.width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.frames[index].minX,
-                                      y: bounds.minY + result.frames[index].minY),
-                          proposal: .unspecified)
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(wrapItems(), id: \.id) { row in
+                HStack(spacing: spacing) {
+                    ForEach(row.items, id: \.self) { item in
+                        content(item)
+                    }
+                    Spacer()
+                }
+            }
         }
     }
     
-    struct FlowResult {
-        var size: CGSize = .zero
-        var frames: [CGRect] = []
+    private func wrapItems() -> [WrappingRow<Item>] {
+        var rows: [WrappingRow<Item>] = []
+        var currentRow = WrappingRow<Item>(id: 0, items: [])
+        var currentWidth: CGFloat = 0
+        let maxWidth: CGFloat = 250 // Approximate width for the panel
         
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
+        for item in items {
+            // Estimate item width (rough approximation)
+            let itemWidth: CGFloat = 80 // Approximate tag width
             
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                
-                if currentX + size.width > maxWidth && currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
-                }
-                
-                frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
-                lineHeight = max(lineHeight, size.height)
-                currentX += size.width + spacing
+            if currentWidth + itemWidth > maxWidth && !currentRow.items.isEmpty {
+                rows.append(currentRow)
+                currentRow = WrappingRow<Item>(id: rows.count, items: [])
+                currentWidth = 0
             }
             
-            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
+            currentRow.items.append(item)
+            currentWidth += itemWidth + spacing
         }
+        
+        if !currentRow.items.isEmpty {
+            rows.append(currentRow)
+        }
+        
+        return rows.isEmpty ? [WrappingRow<Item>(id: 0, items: [])] : rows
+    }
+    
+    private struct WrappingRow<RowItem: Hashable>: Identifiable {
+        let id: Int
+        var items: [RowItem]
     }
 }
 
