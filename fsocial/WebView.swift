@@ -45,7 +45,7 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
     
-    private func updateNavigationState() {
+    func updateNavigationState() {
         guard let webView = webView else { return }
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
