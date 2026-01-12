@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# fsocial - Release Build Script
+# Social Hub - Release Build Script
 # This script builds, signs, notarizes, packages, and publishes the app
 # Builds Universal Binary for both Intel and Apple Silicon Macs
 
@@ -29,7 +29,7 @@ PATCH=$((PATCH + 1))
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 
 echo "============================================"
-echo "Building fsocial v$NEW_VERSION"
+echo "Building Social Hub v$NEW_VERSION"
 echo "============================================"
 echo ""
 
@@ -75,7 +75,7 @@ rm -f "$DMG_PATH"
 TEMP_DMG_DIR=$(mktemp -d)
 cp -R "$APP_PATH" "$TEMP_DMG_DIR/"
 ln -s /Applications "$TEMP_DMG_DIR/Applications"
-hdiutil create -volname "fsocial" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH"
+hdiutil create -volname "Social Hub" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH"
 rm -rf "$TEMP_DMG_DIR"
 rm -f "$ZIP_PATH"
 
@@ -83,7 +83,7 @@ echo ""
 echo "[7/7] Publishing to GitHub..."
 gh release create "v$NEW_VERSION" \
   --repo "$GITHUB_REPO" \
-  --title "fsocial v$NEW_VERSION" \
+  --title "Social Hub v$NEW_VERSION" \
   --notes "Release v$NEW_VERSION - Universal Binary (Intel + Apple Silicon)" \
   "$DMG_PATH"
 
