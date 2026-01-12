@@ -8,7 +8,7 @@ set -e
 
 PROJECT_DIR="/Users/masdawg/Desktop/Brain/Mason/1. Projects/1. Code/1. Apps/fsocial/fsocial"
 APP_NAME="fsocial"
-DMG_NAME="SocialHub"
+DMG_NAME="fsocial"
 DEVELOPER_ID="Developer ID Application: Mason Earl (3FXGJUET7Y)"
 NOTARY_PROFILE="fsocial-notary"
 GITHUB_REPO="buildmase/fsocial"

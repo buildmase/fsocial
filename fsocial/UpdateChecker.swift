@@ -156,7 +156,7 @@ class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // Move to Downloads folder
         let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-        let destinationURL = downloadsURL.appendingPathComponent("SocialHub-Update.dmg")
+        let destinationURL = downloadsURL.appendingPathComponent("fsocial-Update.dmg")
         
         // Remove existing file if present
         try? FileManager.default.removeItem(at: destinationURL)
