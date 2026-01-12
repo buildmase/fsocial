@@ -203,126 +203,199 @@ struct UpdateAlertView: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(Color.appAccent)
+        VStack(spacing: 0) {
+            // Header with gradient accent
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.appAccent, Color.appAccent.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 56, height: 56)
+                    
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(spacing: 4) {
                     Text("Update Available")
-                        .font(.headline)
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color.appText)
-                    Text("Version \(updateChecker.latestVersion)")
-                        .font(.subheadline)
+                    
+                    Text("A new version of fsocial is ready")
+                        .font(.system(size: 13))
                         .foregroundStyle(Color.appTextMuted)
                 }
-                
-                Spacer()
             }
+            .padding(.top, 24)
+            .padding(.bottom, 20)
             
-            // Current vs New version
-            HStack {
-                VStack(spacing: 2) {
+            // Version comparison
+            HStack(spacing: 20) {
+                VStack(spacing: 6) {
                     Text(updateChecker.currentVersionString)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.appTextMuted)
-                    Text("Current")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.appTextMuted.opacity(0.7))
+                    Text("Installed")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.appTextMuted.opacity(0.6))
+                        .textCase(.uppercase)
                 }
+                .frame(width: 100)
                 
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.appAccent)
-                
-                VStack(spacing: 2) {
-                    Text(updateChecker.latestVersion)
-                        .font(.system(size: 14, weight: .medium))
+                ZStack {
+                    Circle()
+                        .fill(Color.appSecondary)
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "chevron.right.2")
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color.appAccent)
-                    Text("New")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.appAccent.opacity(0.7))
                 }
+                
+                VStack(spacing: 6) {
+                    Text(updateChecker.latestVersion)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.appAccent)
+                    Text("Available")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.appAccent.opacity(0.7))
+                        .textCase(.uppercase)
+                }
+                .frame(width: 100)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 24)
+            .background(Color.appSecondary.opacity(0.5))
+            .cornerRadius(12)
+            .padding(.horizontal, 24)
             
             // Release notes
             if !updateChecker.releaseNotes.isEmpty {
-                ScrollView {
-                    Text(updateChecker.releaseNotes)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.appText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("What's New")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.appTextMuted)
+                        .textCase(.uppercase)
+                    
+                    ScrollView {
+                        Text(updateChecker.releaseNotes)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.appText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 80)
                 }
-                .frame(maxHeight: 120)
-                .padding(8)
-                .background(Color.appSecondary)
-                .cornerRadius(6)
+                .padding(16)
+                .background(Color.appSecondary.opacity(0.3))
+                .cornerRadius(10)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
             }
             
             // Download progress
             if updateChecker.isDownloading {
-                VStack(spacing: 8) {
-                    ProgressView(value: updateChecker.downloadProgress)
-                        .progressViewStyle(.linear)
+                VStack(spacing: 10) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.appSecondary)
+                                .frame(height: 8)
+                            
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.appAccent, Color.appAccent.opacity(0.7)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geo.size.width * updateChecker.downloadProgress, height: 8)
+                        }
+                    }
+                    .frame(height: 8)
                     
                     HStack {
-                        Text("Downloading...")
-                            .font(.system(size: 11))
+                        Text("Downloading update...")
+                            .font(.system(size: 12))
                             .foregroundStyle(Color.appTextMuted)
                         Spacer()
                         Text("\(Int(updateChecker.downloadProgress * 100))%")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.appAccent)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
             }
             
             // Buttons
             HStack(spacing: 12) {
-                Button("Later") {
+                Button {
                     updateChecker.cancelDownload()
                     isPresented = false
+                } label: {
+                    Text("Later")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.appTextMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.appSecondary)
+                        .cornerRadius(10)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(Color.appSecondary)
-                .cornerRadius(6)
                 
                 if updateChecker.isDownloading {
-                    Button("Cancel") {
+                    Button {
                         updateChecker.cancelDownload()
+                    } label: {
+                        Text("Cancel")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.red.opacity(0.15))
+                            .cornerRadius(10)
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.red.opacity(0.2))
-                    .foregroundStyle(Color.red)
-                    .cornerRadius(6)
                 } else {
-                    Button("Download & Install") {
+                    Button {
                         updateChecker.downloadAndInstall()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 14))
+                            Text("Update Now")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.appAccent, Color.appAccent.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(10)
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.appAccent)
-                    .foregroundStyle(Color.white)
-                    .cornerRadius(6)
                 }
             }
+            .padding(24)
         }
-        .padding(20)
-        .frame(width: 400)
+        .frame(width: 380)
         .background(Color.appBackground)
-        .cornerRadius(12)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.appBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.appBorder.opacity(0.5), lineWidth: 1)
         )
     }
 }
