@@ -228,6 +228,21 @@ struct SettingsView: View {
                 
                 HStack(spacing: 16) {
                     Button {
+                        if let url = URL(string: "mailto:hi@masonearl.com") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 11))
+                            Text("Support")
+                        }
+                        .font(AppTypography.sectionLabel)
+                        .foregroundStyle(Color.appAccent)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
                         if let url = URL(string: "https://github.com/buildmase/fsocial") {
                             NSWorkspace.shared.open(url)
                         }
@@ -241,12 +256,12 @@ struct SettingsView: View {
                         .foregroundStyle(Color.appAccent)
                     }
                     .buttonStyle(.plain)
-                    
-                    Text("Made by Mason Earl")
-                        .font(AppTypography.sectionLabel)
-                        .foregroundStyle(Color.appTextMuted)
                 }
                 .padding(.top, 4)
+                
+                Text("Made by Mason Earl")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(Color.appTextMuted)
             }
             .padding(16)
             .background(Color.appSecondary.opacity(0.3))
