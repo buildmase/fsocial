@@ -103,22 +103,34 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     
                     if updateChecker.updateAvailable {
-                        Button {
-                            updateChecker.openDownloadPage()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                    .font(.system(size: 12))
-                                Text("Download Update")
+                        if updateChecker.isDownloading {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("\(Int(updateChecker.downloadProgress * 100))%")
                                     .font(AppTypography.body)
+                                    .foregroundStyle(Color.appAccent)
                             }
-                            .foregroundStyle(Color.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.appAccent)
-                            .cornerRadius(AppDimensions.borderRadius)
+                        } else {
+                            Button {
+                                updateChecker.downloadAndInstall()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.system(size: 12))
+                                    Text("Download & Install")
+                                        .font(AppTypography.body)
+                                }
+                                .foregroundStyle(Color.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.appAccent)
+                                .cornerRadius(AppDimensions.borderRadius)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
