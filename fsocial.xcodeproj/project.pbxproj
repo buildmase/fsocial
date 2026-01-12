@@ -260,7 +260,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Social Hub";
+				INFOPLIST_KEY_CFBundleDisplayName = fsocial;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Mason Earl. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -296,7 +296,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Social Hub";
+				INFOPLIST_KEY_CFBundleDisplayName = fsocial;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Mason Earl. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (

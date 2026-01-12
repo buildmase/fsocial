@@ -137,7 +137,7 @@ class UpdateChecker: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             let alert = NSAlert()
             alert.messageText = "Installing Update"
-            alert.informativeText = "Drag Social Hub to the Applications folder to complete the update, then relaunch the app."
+            alert.informativeText = "Drag fsocial to the Applications folder to complete the update, then relaunch the app."
             alert.alertStyle = .informational
             alert.addButton(withTitle: "OK")
             alert.runModal()

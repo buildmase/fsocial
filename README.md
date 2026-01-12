@@ -1,4 +1,4 @@
-# Social Hub
+# fsocial
 
 A macOS social media management app with embedded browsers, quick-reply templates, content scheduling, and post composer.
 

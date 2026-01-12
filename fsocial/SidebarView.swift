@@ -115,7 +115,7 @@ struct SidebarView: View {
                 .frame(width: 32, height: 32)
                 .cornerRadius(6)
             
-            Text("Social Hub")
+            Text("fsocial")
                 .font(AppTypography.title)
                 .foregroundStyle(Color.appText)
             

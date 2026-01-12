@@ -216,7 +216,7 @@ struct SettingsView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Social Hub")
+                    Text("fsocial")
                         .font(AppTypography.bodyMedium)
                         .foregroundStyle(Color.appText)
                     Spacer()
