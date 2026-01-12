@@ -26,19 +26,21 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     weak var webView: WKWebView?
     
     func goBack() {
-        guard let webView = webView, webView.canGoBack else { return }
+        guard let webView = webView else { return }
+        // Always try to go back - let WKWebView handle if it can't
         webView.goBack()
-        // Update state immediately
-        DispatchQueue.main.async {
+        // Update state after a short delay to ensure webView state is updated
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.updateNavigationState()
         }
     }
     
     func goForward() {
-        guard let webView = webView, webView.canGoForward else { return }
+        guard let webView = webView else { return }
+        // Always try to go forward - let WKWebView handle if it can't
         webView.goForward()
-        // Update state immediately
-        DispatchQueue.main.async {
+        // Update state after a short delay to ensure webView state is updated
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.updateNavigationState()
         }
     }
@@ -448,13 +450,17 @@ class WebViewCoordinator: NSObject, ObservableObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         DispatchQueue.main.async {
             self.isLoading = false
-            self.updateNavigationState()
             self.pageTitle = webView.title ?? ""
+            // Update navigation state with a small delay to ensure webView state is ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.updateNavigationState()
+            }
         }
     }
     
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         DispatchQueue.main.async {
+            // Update navigation state immediately when navigation commits
             self.updateNavigationState()
         }
     }
