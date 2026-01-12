@@ -29,7 +29,7 @@ PATCH=$((PATCH + 1))
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 
 echo "============================================"
-echo "Building Social Hub v$NEW_VERSION"
+echo "Building fsocial v$NEW_VERSION"
 echo "============================================"
 echo ""
 
@@ -75,7 +75,7 @@ rm -f "$DMG_PATH"
 TEMP_DMG_DIR=$(mktemp -d)
 cp -R "$APP_PATH" "$TEMP_DMG_DIR/"
 ln -s /Applications "$TEMP_DMG_DIR/Applications"
-hdiutil create -volname "Social Hub" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH"
+hdiutil create -volname "fsocial" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH"
 rm -rf "$TEMP_DMG_DIR"
 rm -f "$ZIP_PATH"
 
